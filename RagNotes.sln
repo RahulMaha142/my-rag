@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{50A7BC23-218C-45B6-9E93-ED989C50A9B0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagNotes.Web", "src\RagNotes.Web\RagNotes.Web.csproj", "{70F09452-895E-4CEA-A12C-EDC59AADADE1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{592C6439-8EF6-470D-B2D1-88D35B1D4C21}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagNotes.Tests", "tests\RagNotes.Tests\RagNotes.Tests.csproj", "{560A129D-8AA9-401E-9274-55A248254202}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{70F09452-895E-4CEA-A12C-EDC59AADADE1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70F09452-895E-4CEA-A12C-EDC59AADADE1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70F09452-895E-4CEA-A12C-EDC59AADADE1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70F09452-895E-4CEA-A12C-EDC59AADADE1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{560A129D-8AA9-401E-9274-55A248254202}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{560A129D-8AA9-401E-9274-55A248254202}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{560A129D-8AA9-401E-9274-55A248254202}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{560A129D-8AA9-401E-9274-55A248254202}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{70F09452-895E-4CEA-A12C-EDC59AADADE1} = {50A7BC23-218C-45B6-9E93-ED989C50A9B0}
+		{560A129D-8AA9-401E-9274-55A248254202} = {592C6439-8EF6-470D-B2D1-88D35B1D4C21}
+	EndGlobalSection
+EndGlobal
