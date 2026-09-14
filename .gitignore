@@ -64,3 +64,6 @@ appsettings.Development.local.json
 
 # OS generated files
 Thumbs.db
+
+# SQLite database
+RagNotes.db
