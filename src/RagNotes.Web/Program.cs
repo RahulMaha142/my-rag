@@ -1,4 +1,11 @@
+using RagNotes.Web.Data; 
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Add DbContext
+builder.Services.AddDbContext<RagNotesDbContext>(options => 
+    options.UseSqlite("Data Source=RagNotes.db"));
 
 // Add services to the container.
 builder.Services.AddRazorPages();
