@@ -1,0 +1,64 @@
+﻿@page
+@model RagNotes.Web.Pages.Documents.IndexModel
+@{
+    ViewData["Title"] = "Documents";
+}
+
+<h1>Upload Document</h1>
+
+@if (!string.IsNullOrEmpty(Model.StatusMessage))
+{
+    <div class="alert alert-info">@Model.StatusMessage</div>
+}
+
+<form method="post" enctype="multipart/form-data" class="mb-4">
+    <div class="mb-3">
+        <label for="file" class="form-label">Choose File</label>
+        <input type="file"
+               class="form-control"
+               id="file"
+               name="file"
+               accept=".txt,.md"
+               required />
+    </div>
+    <button type="submit" class="btn btn-primary">Upload</button>
+</form>
+
+<h2>Uploaded Documents</h2>
+
+@if (Model.Documents.Count == 0)
+{
+    <p>No documents yet.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>File name</th>
+                <th>Uploaded</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var doc in Model.Documents)
+        {
+            <tr>
+                <td>
+                    <a asp-page="./Details" asp-route-id="@doc.Id">@doc.FileName</a>
+                </td>
+                <td>@doc.CreatedAt.ToLocalTime().ToString("g")</td>
+                <td>
+                    <form method="post" asp-page-handler="Delete">
+                        <input type="hidden" name="id" value="@doc.Id" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                onclick="return confirm('Delete this document?');">
+                            Delete
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
