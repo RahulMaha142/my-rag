@@ -14,3 +14,22 @@
 </p>
 
 <pre class="border p-3 bg-light" style="white-space: pre-wrap;">@Model.Document.Content</pre>
+
+<h2 class="mt-4">Chunks (@Model.Chunks.Count)</h2>
+
+@if (Model.Chunks.Count == 0)
+{
+    <p class="text-muted">No chunks produced.</p>
+}
+else
+{
+    <div class="vstack gap-2">
+    @foreach (var chunk in Model.Chunks)
+    {
+        <div class="border p-3 bg-light">
+            <div class="text-muted small mb-1">Chunk @chunk.ChunkIndex</div>
+            <pre class="mb-0" style="white-space: pre-wrap;">@chunk.Text</pre>
+        </div>
+    }
+    </div>
+}

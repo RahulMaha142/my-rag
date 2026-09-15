@@ -1,6 +1,6 @@
-using RagNotes.Web.Data; 
+using RagNotes.Web.Data;
+using RagNotes.Web.Services.Chunking;
 using Microsoft.EntityFrameworkCore;
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add DbContext
@@ -9,6 +9,7 @@ builder.Services.AddDbContext<RagNotesDbContext>(options =>
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+builder.Services.AddSingleton<ITextChunker, SimpleTextChunker>();
 
 var app = builder.Build();
 
