@@ -24,11 +24,14 @@
 else
 {
     <div class="vstack gap-2">
-    @foreach (var chunk in Model.Chunks)
+    @foreach (var item in Model.Chunks)
     {
         <div class="border p-3 bg-light">
-            <div class="text-muted small mb-1">Chunk @chunk.ChunkIndex</div>
-            <pre class="mb-0" style="white-space: pre-wrap;">@chunk.Text</pre>
+            <div class="text-muted small mb-1">
+                Chunk @item.Chunk.ChunkIndex
+                · embedding @item.Embedding.Length dims
+            </div>
+            <pre class="mb-0" style="white-space: pre-wrap;">@item.Chunk.Text</pre>
         </div>
     }
     </div>

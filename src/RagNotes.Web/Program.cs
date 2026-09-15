@@ -1,5 +1,7 @@
 using RagNotes.Web.Data;
 using RagNotes.Web.Services.Chunking;
+using RagNotes.Web.Services.Embeddings;
+using RagNotes.Web.Options;
 using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +12,13 @@ builder.Services.AddDbContext<RagNotesDbContext>(options =>
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddSingleton<ITextChunker, SimpleTextChunker>();
-
+builder.Services.Configure<OllamaOptions>(
+    builder.Configuration.GetSection(OllamaOptions.SectionName));
+builder.Services.AddHttpClient<IEmbeddingService, OllamaEmbeddingService>((sp, client) =>
+{
+    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+});
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
