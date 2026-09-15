@@ -1,31 +1,48 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Qdrant.Client;
 using RagNotes.Web.Data;
+using RagNotes.Web.Options;
+using RagNotes.Web.Services;
 using RagNotes.Web.Services.Chunking;
 using RagNotes.Web.Services.Embeddings;
-using RagNotes.Web.Options;
-using Microsoft.EntityFrameworkCore;
+using RagNotes.Web.Services.VectorStore;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add DbContext
-builder.Services.AddDbContext<RagNotesDbContext>(options => 
+builder.Services.AddDbContext<RagNotesDbContext>(options =>
     options.UseSqlite("Data Source=RagNotes.db"));
 
-// Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddSingleton<ITextChunker, SimpleTextChunker>();
 builder.Services.Configure<OllamaOptions>(
     builder.Configuration.GetSection(OllamaOptions.SectionName));
+builder.Services.Configure<QdrantOptions>(
+    builder.Configuration.GetSection(QdrantOptions.SectionName));
 builder.Services.AddHttpClient<IEmbeddingService, OllamaEmbeddingService>((sp, client) =>
 {
-    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
+    var options = sp.GetRequiredService<IOptions<OllamaOptions>>().Value;
     client.BaseAddress = new Uri(options.BaseUrl);
 });
+builder.Services.AddSingleton(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<QdrantOptions>>().Value;
+    return new QdrantClient(options.Host, options.Port);
+});
+builder.Services.AddSingleton<IVectorStore, QdrantVectorStore>();
+builder.Services.AddScoped<DocumentIndexingService>();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+using (var scope = app.Services.CreateScope())
+{
+    var vectorStore = scope.ServiceProvider.GetRequiredService<IVectorStore>();
+    await vectorStore.EnsureCollectionAsync();
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 

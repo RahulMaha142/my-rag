@@ -16,6 +16,9 @@
 <pre class="border p-3 bg-light" style="white-space: pre-wrap;">@Model.Document.Content</pre>
 
 <h2 class="mt-4">Chunks (@Model.Chunks.Count)</h2>
+<p class="text-muted">
+    Vectors for these chunks are stored in Qdrant.
+</p>
 
 @if (Model.Chunks.Count == 0)
 {
@@ -24,14 +27,13 @@
 else
 {
     <div class="vstack gap-2">
-    @foreach (var item in Model.Chunks)
+    @foreach (var chunk in Model.Chunks)
     {
         <div class="border p-3 bg-light">
             <div class="text-muted small mb-1">
-                Chunk @item.Chunk.ChunkIndex
-                · embedding @item.Embedding.Length dims
+                Chunk @chunk.ChunkIndex
             </div>
-            <pre class="mb-0" style="white-space: pre-wrap;">@item.Chunk.Text</pre>
+            <pre class="mb-0" style="white-space: pre-wrap;">@chunk.Text</pre>
         </div>
     }
     </div>

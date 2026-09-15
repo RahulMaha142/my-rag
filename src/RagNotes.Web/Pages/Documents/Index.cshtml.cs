@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using RagNotes.Web.Data;
 using RagNotes.Web.Models;
+using RagNotes.Web.Services;
 
 namespace RagNotes.Web.Pages.Documents;
 
@@ -14,10 +15,12 @@ public class IndexModel : PageModel
     private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
 
     private readonly RagNotesDbContext _db;
+    private readonly DocumentIndexingService _indexing;
 
-    public IndexModel(RagNotesDbContext db)
+    public IndexModel(RagNotesDbContext db, DocumentIndexingService indexing)
     {
         _db = db;
+        _indexing = indexing;
     }
 
     public List<Document> Documents { get; private set; } = [];
@@ -32,7 +35,9 @@ public class IndexModel : PageModel
             .ToListAsync();
     }
 
-    public async Task<IActionResult> OnPostAsync(IFormFile? file)
+    public async Task<IActionResult> OnPostAsync(
+        IFormFile? file,
+        CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
         {
@@ -56,7 +61,7 @@ public class IndexModel : PageModel
         string content;
         using (var reader = new StreamReader(file.OpenReadStream()))
         {
-            content = await reader.ReadToEndAsync();
+            content = await reader.ReadToEndAsync(cancellationToken);
         }
 
         var document = new Document
@@ -67,19 +72,28 @@ public class IndexModel : PageModel
         };
 
         _db.Documents.Add(document);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(cancellationToken);
 
-        StatusMessage = $"Uploaded \"{document.FileName}\".";
+        var chunkCount = await _indexing.IndexAsync(
+            document.Id,
+            document.FileName,
+            document.Content,
+            cancellationToken);
+
+        StatusMessage = $"Uploaded \"{document.FileName}\" ({chunkCount} chunks indexed).";
         return RedirectToPage();
     }
 
-    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    public async Task<IActionResult> OnPostDeleteAsync(
+        int id,
+        CancellationToken cancellationToken)
     {
-        var document = await _db.Documents.FindAsync(id);
+        var document = await _db.Documents.FindAsync([id], cancellationToken);
         if (document is not null)
         {
+            await _indexing.DeleteAsync(id, cancellationToken);
             _db.Documents.Remove(document);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(cancellationToken);
             StatusMessage = $"Deleted \"{document.FileName}\".";
         }
 
