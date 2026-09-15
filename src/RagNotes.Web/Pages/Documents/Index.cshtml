@@ -45,7 +45,7 @@ else
         {
             <tr>
                 <td>
-                    <a asp-page="./Details" asp-route-id="@doc.Id">@doc.FileName</a>
+                    <a asp-page="/Documents/Details" asp-route-id="@doc.Id">@doc.FileName</a>
                 </td>
                 <td>@doc.CreatedAt.ToLocalTime().ToString("g")</td>
                 <td>

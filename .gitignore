@@ -67,3 +67,5 @@ Thumbs.db
 
 # SQLite database
 RagNotes.db
+RagNotes.db-shm
+RagNotes.db-wal
