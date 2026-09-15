@@ -49,6 +49,11 @@ wwwroot/lib/
 .env.*
 !.env.example
 
+# Local SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
 # Local development settings
 appsettings.Local.json
 appsettings.Development.local.json
