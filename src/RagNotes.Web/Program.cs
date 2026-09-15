@@ -31,6 +31,7 @@ builder.Services.AddSingleton(sp =>
 });
 builder.Services.AddSingleton<IVectorStore, QdrantVectorStore>();
 builder.Services.AddScoped<DocumentIndexingService>();
+builder.Services.AddScoped<SemanticSearchService>();
 
 var app = builder.Build();
 

@@ -11,4 +11,9 @@ public interface IVectorStore
     Task DeleteByDocumentAsync(
         int documentId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SearchHit>> SearchAsync(
+        float[] embedding,
+        int topK = 5,
+        CancellationToken cancellationToken = default);
 }

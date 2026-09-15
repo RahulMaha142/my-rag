@@ -1,0 +1,44 @@
+@page
+@model RagNotes.Web.Pages.Search.IndexModel
+@{
+    ViewData["Title"] = "Search";
+}
+
+<h1>Search</h1>
+
+<form method="post" class="mb-4">
+    <div class="mb-3">
+        <label asp-for="Query" class="form-label"></label>
+        <input asp-for="Query"
+               class="form-control"
+               placeholder="What is dependency injection?"
+               autofocus />
+        <span asp-validation-for="Query" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Search</button>
+</form>
+
+@if (Model.HasSearched)
+{
+    <h2>Results</h2>
+
+    @if (Model.Results.Count == 0)
+    {
+        <p>No matching chunks found. Upload and index documents first.</p>
+    }
+    else
+    {
+        @foreach (var hit in Model.Results)
+        {
+            <div class="mb-4">
+                <div class="fw-bold">@hit.Score.ToString("0.00")</div>
+                <div class="text-muted mb-1">@hit.FileName — Chunk @hit.ChunkIndex</div>
+                <blockquote class="border-start border-3 ps-3 mb-0">@hit.Text</blockquote>
+            </div>
+        }
+    }
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

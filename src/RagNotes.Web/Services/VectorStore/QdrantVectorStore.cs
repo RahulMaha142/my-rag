@@ -84,4 +84,24 @@ public class QdrantVectorStore : IVectorStore
             filter: Match("documentId", documentId),
             cancellationToken: cancellationToken);
     }
+
+    public async Task<IReadOnlyList<SearchHit>> SearchAsync(
+        float[] embedding,
+        int topK = 5,
+        CancellationToken cancellationToken = default)
+    {
+        var points = await _client.QueryAsync(
+            collectionName: _options.CollectionName,
+            query: embedding,
+            limit: (ulong)topK,
+            payloadSelector: true,
+            cancellationToken: cancellationToken);
+
+        return points.Select(point => new SearchHit(
+            Score: point.Score,
+            DocumentId: (int)point.Payload["documentId"].IntegerValue,
+            FileName: point.Payload["fileName"].StringValue,
+            ChunkIndex: (int)point.Payload["chunkIndex"].IntegerValue,
+            Text: point.Payload["text"].StringValue)).ToList();
+    }
 }
