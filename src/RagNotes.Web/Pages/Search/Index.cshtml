@@ -15,12 +15,18 @@
                autofocus />
         <span asp-validation-for="Query" class="text-danger"></span>
     </div>
-    <button type="submit" class="btn btn-primary">Search</button>
+    <button type="submit" class="btn btn-primary">Ask</button>
 </form>
 
 @if (Model.HasSearched)
 {
-    <h2>Results</h2>
+    @if (!string.IsNullOrWhiteSpace(Model.Answer))
+    {
+        <h2>Answer</h2>
+        <div class="mb-4" style="white-space: pre-wrap;">@Model.Answer</div>
+    }
+
+    <h2>Sources</h2>
 
     @if (Model.Results.Count == 0)
     {
