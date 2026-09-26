@@ -23,7 +23,13 @@ public class OllamaEmbeddingService : IEmbeddingService
             new { model = _options.EmbeddingModel, prompt = text },
             cancellationToken);
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new HttpRequestException(
+                $"Ollama embeddings failed ({(int)response.StatusCode}): {body}. " +
+                $"Model '{_options.EmbeddingModel}' must be pulled (ollama pull {_options.EmbeddingModel}).");
+        }
 
         var result = await response.Content
             .ReadFromJsonAsync<OllamaEmbeddingResponse>(cancellationToken);
