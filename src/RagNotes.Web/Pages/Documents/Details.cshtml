@@ -1,5 +1,6 @@
 @page "{id:int}"
 @model RagNotes.Web.Pages.Documents.DetailsModel
+@using RagNotes.Web.Models
 @{
     ViewData["Title"] = Model.Document.FileName;
     var rangeStart = Model.TotalChunks == 0 ? 0 : ((Model.PageNumber - 1) * Model.PageSize) + 1;
@@ -9,6 +10,11 @@
 <p>
     <a asp-page="/Documents/Index">&larr; Back to documents</a>
 </p>
+
+@if (!string.IsNullOrEmpty(Model.StatusMessage))
+{
+    <div class="alert alert-info">@Model.StatusMessage</div>
+}
 
 <h1>@Model.Document.FileName</h1>
 <p class="text-muted">
@@ -38,6 +44,52 @@
         }
     </p>
 }
+
+<h2 class="mt-4">Chunking</h2>
+<p class="text-muted">
+    Saving replaces this document’s embeddings with chunks from the new settings.
+</p>
+<form method="post" asp-page-handler="Reindex" class="mb-4">
+    <input type="hidden" name="id" value="@Model.Document.Id" />
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label for="maxTokens" class="form-label">Max tokens</label>
+            <input type="number"
+                   class="form-control"
+                   id="maxTokens"
+                   name="maxTokens"
+                   value="@Model.Document.MaxTokens"
+                   min="@ChunkOptions.MinMaxTokens"
+                   max="@ChunkOptions.MaxMaxTokens"
+                   required />
+            <div class="form-text">Hard cap for each chunk (32–2048).</div>
+        </div>
+        <div class="col-md-4">
+            <label for="overlapPercent" class="form-label">Overlap percent</label>
+            <input type="number"
+                   class="form-control"
+                   id="overlapPercent"
+                   name="overlapPercent"
+                   value="@Model.Document.OverlapPercent"
+                   min="@ChunkOptions.MinOverlapPercent"
+                   max="@ChunkOptions.MaxOverlapPercent"
+                   required />
+            <div class="form-text">Share of the cap repeated on the next chunk (0–50).</div>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check mb-2">
+                <input class="form-check-input"
+                       type="checkbox"
+                       id="preferSentences"
+                       name="preferSentences"
+                       value="true"
+                       @(Model.Document.PreferSentences ? "checked" : null) />
+                <label class="form-check-label" for="preferSentences">Keep sentences together</label>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save and reindex</button>
+</form>
 
 <h2 class="mt-4">
     Chunks

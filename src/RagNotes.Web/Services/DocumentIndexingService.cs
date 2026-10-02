@@ -51,6 +51,17 @@ public class DocumentIndexingService
         return records.Count;
     }
 
+    public async Task<int> ReindexAsync(
+        int documentId,
+        string fileName,
+        string content,
+        ChunkOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        await DeleteAsync(documentId, cancellationToken);
+        return await IndexAsync(documentId, fileName, content, options, cancellationToken);
+    }
+
     public Task DeleteAsync(int documentId, CancellationToken cancellationToken = default)
         => _vectorStore.DeleteByDocumentAsync(documentId, cancellationToken);
 }
