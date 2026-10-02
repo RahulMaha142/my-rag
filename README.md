@@ -5,13 +5,25 @@ Playing around with LLMs and embeddings.
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- [Ollama](https://ollama.com/) with the models from `Options/OllamaOptions.cs` pulled:
-  ```bash
-  ollama pull bge-m3
-  ollama pull granite3.3:8b
-  ```
-  Change `EmbeddingModel` / `ChatModel` there (and `VectorSize` in `Options/QdrantOptions.cs` to match the embedding dims).
 - [Docker](https://www.docker.com/) for Qdrant
+- Either [oMLX](https://github.com/jundot/omlx) or [Ollama](https://ollama.com/). Set `Inference:Provider` in `appsettings.json` to `Omlx` (the default) or `Ollama`, then restart the app.
+
+Both default embedding models are 1024-dimensional, which matches `VectorSize` in `Options/QdrantOptions.cs`. Re-upload notes after switching embedding models so Qdrant is not left with vectors from the previous model.
+
+### oMLX
+
+Serve the models named in `appsettings.json` (`Omlx:EmbeddingModel` and `Omlx:ChatModel`). Folder names under the oMLX model directory are the model ids. Default base URL is `http://127.0.0.1:8000`. If the server requires a key, put `Omlx_api_key=...` in a `.env` file at the repo root. The app loads that file at startup.
+
+### Ollama
+
+Install [Ollama](https://ollama.com/), then pull the models named under `Ollama` in `appsettings.json` (or change those names to models you already have):
+
+```bash
+ollama pull bge-m3
+ollama pull granite3.3:8b
+```
+
+Default base URL is `http://localhost:11434`.
 
 ## Start Qdrant
 

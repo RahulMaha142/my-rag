@@ -19,8 +19,8 @@ public class OllamaEmbeddingService : IEmbeddingService
     public async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
     {
         var response = await _http.PostAsJsonAsync(
-            "/api/embeddings",
-            new { model = _options.EmbeddingModel, prompt = text },
+            "/api/embed",
+            new { model = _options.EmbeddingModel, input = text },
             cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -34,18 +34,19 @@ public class OllamaEmbeddingService : IEmbeddingService
         var result = await response.Content
             .ReadFromJsonAsync<OllamaEmbeddingResponse>(cancellationToken);
 
-        if (result?.Embedding is null || result.Embedding.Length == 0)
+        var embedding = result?.Embeddings.FirstOrDefault();
+        if (embedding is null || embedding.Length == 0)
         {
             throw new InvalidOperationException(
                 "Ollama returned an empty embedding.");
         }
 
-        return result.Embedding;
+        return embedding;
     }
 
     private sealed class OllamaEmbeddingResponse
     {
-        [JsonPropertyName("embedding")]
-        public float[] Embedding { get; set; } = [];
+        [JsonPropertyName("embeddings")]
+        public float[][] Embeddings { get; set; } = [];
     }
 }
