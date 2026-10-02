@@ -37,6 +37,9 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(
         IFormFile? file,
+        int maxTokens,
+        int overlapPercent,
+        bool preferSentences,
         CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
@@ -58,6 +61,15 @@ public class IndexModel : PageModel
             return RedirectToPage();
         }
 
+        var settingsError = ChunkOptions.Validate(maxTokens, overlapPercent);
+        if (settingsError is not null)
+        {
+            StatusMessage = settingsError;
+            return RedirectToPage();
+        }
+
+        var options = new ChunkOptions(maxTokens, overlapPercent, preferSentences);
+
         string content;
         using (var reader = new StreamReader(file.OpenReadStream()))
         {
@@ -68,7 +80,10 @@ public class IndexModel : PageModel
         {
             FileName = Path.GetFileName(file.FileName),
             Content = content,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            MaxTokens = options.MaxTokens,
+            OverlapPercent = options.OverlapPercent,
+            PreferSentences = options.PreferSentences
         };
 
         _db.Documents.Add(document);
@@ -78,6 +93,7 @@ public class IndexModel : PageModel
             document.Id,
             document.FileName,
             document.Content,
+            document.ChunkOptions,
             cancellationToken);
 
         StatusMessage = $"Uploaded \"{document.FileName}\" ({chunkCount} chunks indexed).";

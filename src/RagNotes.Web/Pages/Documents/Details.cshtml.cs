@@ -51,7 +51,7 @@ public class DetailsModel : PageModel
             ? content
             : content[..ContentPreviewLength];
 
-        var allChunks = _chunker.Chunk(content, document.Id);
+        var allChunks = _chunker.Chunk(content, document.Id, document.ChunkOptions);
         TotalChunks = allChunks.Count;
         TotalPages = Math.Max(1, (int)Math.Ceiling(TotalChunks / (double)PageSize));
         PageNumber = Math.Clamp(pageNumber, 1, TotalPages);

@@ -5,14 +5,18 @@ namespace RagNotes.Web.Services.Chunking;
 
 public class SimpleTextChunker : ITextChunker
 {
-  private const int ChunkSize = 1000;
-  private const int Overlap = 200;
-
-  private static readonly Regex SentenceSplit = new(
+  private static readonly Regex SentenceBoundary = new(
       @"(?<=[.!?])\s+",
       RegexOptions.Compiled);
 
-  public IReadOnlyList<TextChunk> Chunk(string text, int documentId)
+  private readonly ITokenCounter _tokenCounter;
+
+  public SimpleTextChunker(ITokenCounter tokenCounter)
+  {
+    _tokenCounter = tokenCounter;
+  }
+
+  public IReadOnlyList<TextChunk> Chunk(string text, int documentId, ChunkOptions options)
   {
     var chunks = new List<TextChunk>();
     if (string.IsNullOrWhiteSpace(text))
@@ -20,25 +24,27 @@ public class SimpleTextChunker : ITextChunker
       return chunks;
     }
 
-    var sentences = SentenceSplit
-        .Split(text.Trim())
-        .Where(s => !string.IsNullOrWhiteSpace(s))
-        .Select(s => s.Trim())
-        .ToList();
-
-    if (sentences.Count == 0)
+    var tokens = _tokenCounter.Tokenize(text);
+    if (tokens.Count == 0)
     {
       return chunks;
     }
 
     var index = 0;
     var id = 1;
-    var current = new List<string>();
-    var currentLength = 0;
 
-    void Flush()
+    void Emit(int tokenStart, int tokenEnd)
     {
-      if (current.Count == 0)
+      if (tokenEnd <= tokenStart)
+      {
+        return;
+      }
+
+      var startChar = tokens[tokenStart].Start;
+      var last = tokens[tokenEnd - 1];
+      var endChar = last.Start + last.Length;
+      var slice = text[startChar..endChar].Trim();
+      if (slice.Length == 0)
       {
         return;
       }
@@ -47,63 +53,155 @@ public class SimpleTextChunker : ITextChunker
       {
         Id = id++,
         DocumentId = documentId,
-        Text = string.Join(" ", current),
+        Text = slice,
         ChunkIndex = index++
       });
     }
 
-    foreach (var sentence in sentences)
+    void EmitWindows(int tokenStart, int tokenEnd)
     {
-      var separator = current.Count == 0 ? 0 : 1; // space between sentences
-      var addedLength = sentence.Length + separator;
-
-      if (current.Count > 0 && currentLength + addedLength > ChunkSize)
+      var overlap = options.OverlapTokens;
+      var start = tokenStart;
+      while (start < tokenEnd)
       {
-        var overlap = TakeOverlap(current);
-        Flush();
-        current = overlap;
-        currentLength = JoinLength(current);
-        separator = current.Count == 0 ? 0 : 1;
-        addedLength = sentence.Length + separator;
-      }
+        var end = Math.Min(start + options.MaxTokens, tokenEnd);
+        Emit(start, end);
+        if (end >= tokenEnd)
+        {
+          break;
+        }
 
-      current.Add(sentence);
-      currentLength += addedLength;
+        var next = end - overlap;
+        if (next <= start)
+        {
+          next = start + 1;
+        }
+
+        start = next;
+      }
     }
 
-    Flush();
+    if (!options.PreferSentences)
+    {
+      EmitWindows(0, tokens.Count);
+      return chunks;
+    }
+
+    var sentences = GroupSentences(text, tokens);
+    var buffer = new List<SentencePiece>();
+    var bufferTokens = 0;
+
+    void EmitBuffer()
+    {
+      if (buffer.Count == 0)
+      {
+        return;
+      }
+
+      Emit(buffer[0].TokenStart, buffer[^1].TokenEnd);
+    }
+
+    foreach (var sentence in sentences)
+    {
+      var size = sentence.TokenCount;
+      if (size > options.MaxTokens)
+      {
+        EmitBuffer();
+        buffer.Clear();
+        bufferTokens = 0;
+        EmitWindows(sentence.TokenStart, sentence.TokenEnd);
+        continue;
+      }
+
+      if (buffer.Count > 0 && bufferTokens + size > options.MaxTokens)
+      {
+        var emitted = buffer.ToList();
+        EmitBuffer();
+        buffer = TakeSentenceOverlap(emitted, options.OverlapTokens);
+        bufferTokens = buffer.Sum(piece => piece.TokenCount);
+        while (buffer.Count > 0 && bufferTokens + size > options.MaxTokens)
+        {
+          bufferTokens -= buffer[0].TokenCount;
+          buffer.RemoveAt(0);
+        }
+      }
+
+      buffer.Add(sentence);
+      bufferTokens += size;
+    }
+
+    EmitBuffer();
     return chunks;
   }
 
-  private static List<string> TakeOverlap(List<string> sentences)
+  private static List<SentencePiece> TakeSentenceOverlap(
+      List<SentencePiece> sentences,
+      int overlapTokens)
   {
-    var overlap = new List<string>();
-    var length = 0;
-
+    var overlap = new List<SentencePiece>();
+    var count = 0;
     for (var i = sentences.Count - 1; i >= 0; i--)
     {
-      var sentence = sentences[i];
-      var separator = overlap.Count == 0 ? 0 : 1;
-      var addedLength = sentence.Length + separator;
-      if (length + addedLength > Overlap)
+      var size = sentences[i].TokenCount;
+      if (count + size > overlapTokens)
       {
         break;
       }
 
-      overlap.Insert(0, sentence);
-      length += addedLength;
+      overlap.Insert(0, sentences[i]);
+      count += size;
     }
 
     return overlap;
   }
 
-  private static int JoinLength(List<string> sentences)
+  private static List<SentencePiece> GroupSentences(string text, IReadOnlyList<TextToken> tokens)
   {
-    if (sentences.Count == 0)
+    var sentences = new List<SentencePiece>();
+    var tokenIndex = 0;
+
+    foreach (var (_, end) in SentenceRanges(text))
     {
-      return 0;
+      var tokenStart = tokenIndex;
+      while (tokenIndex < tokens.Count && tokens[tokenIndex].Start < end)
+      {
+        tokenIndex++;
+      }
+
+      if (tokenIndex > tokenStart)
+      {
+        sentences.Add(new SentencePiece(tokenStart, tokenIndex));
+      }
     }
 
-    return sentences.Sum(s => s.Length) + (sentences.Count - 1);
+    return sentences;
+  }
+
+  private static List<(int Start, int End)> SentenceRanges(string text)
+  {
+    var ranges = new List<(int Start, int End)>();
+    var start = 0;
+    foreach (Match match in SentenceBoundary.Matches(text))
+    {
+      var end = match.Index + match.Length;
+      if (end > start)
+      {
+        ranges.Add((start, end));
+      }
+
+      start = end;
+    }
+
+    if (start < text.Length)
+    {
+      ranges.Add((start, text.Length));
+    }
+
+    return ranges;
+  }
+
+  private readonly record struct SentencePiece(int TokenStart, int TokenEnd)
+  {
+    public int TokenCount => TokenEnd - TokenStart;
   }
 }

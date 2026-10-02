@@ -1,3 +1,4 @@
+using RagNotes.Web.Models;
 using RagNotes.Web.Services.Chunking;
 using RagNotes.Web.Services.Embeddings;
 using RagNotes.Web.Services.VectorStore;
@@ -24,9 +25,10 @@ public class DocumentIndexingService
         int documentId,
         string fileName,
         string content,
+        ChunkOptions options,
         CancellationToken cancellationToken = default)
     {
-        var chunks = _chunker.Chunk(content, documentId);
+        var chunks = _chunker.Chunk(content, documentId, options);
         if (chunks.Count == 0)
         {
             return 0;

@@ -18,6 +18,7 @@ builder.Services.AddDbContext<RagNotesDbContext>(options =>
     options.UseSqlite("Data Source=RagNotes.db"));
 
 builder.Services.AddRazorPages();
+builder.Services.AddSingleton<ITokenCounter, ApproximateTokenCounter>();
 builder.Services.AddSingleton<ITextChunker, SimpleTextChunker>();
 builder.Services.Configure<InferenceOptions>(
     builder.Configuration.GetSection(InferenceOptions.SectionName));
