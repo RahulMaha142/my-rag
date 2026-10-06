@@ -16,18 +16,23 @@ public class OmlxLlmService : ILlmService
         _options = options.Value;
     }
 
-    public async Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateAsync(
+        string prompt,
+        string? model = null,
+        CancellationToken cancellationToken = default)
     {
+        var chatModel = _options.ResolveChatModel(model);
         var response = await _http.PostAsJsonAsync(
             "/v1/chat/completions",
             new
             {
-                model = _options.ChatModel,
+                model = chatModel,
                 messages = new[]
                 {
                     new { role = "user", content = prompt }
                 },
-                stream = false
+                stream = false,
+                chat_template_kwargs = new { enable_thinking = false }
             },
             cancellationToken);
 
@@ -36,7 +41,7 @@ public class OmlxLlmService : ILlmService
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new HttpRequestException(
                 $"oMLX chat failed ({(int)response.StatusCode}): {body}. " +
-                $"Model '{_options.ChatModel}' must be loaded in oMLX.");
+                $"Model '{chatModel}' must be loaded in oMLX.");
         }
 
         var result = await response.Content

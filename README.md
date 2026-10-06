@@ -12,7 +12,7 @@ Both default embedding models are 1024-dimensional, which matches `VectorSize` i
 
 ### oMLX
 
-Serve the models named in `appsettings.json` (`Omlx:EmbeddingModel` and `Omlx:ChatModel`). Folder names under the oMLX model directory are the model ids. Default base URL is `http://127.0.0.1:8000`. If the server requires a key, put `Omlx_api_key=...` in a `.env` file at the repo root. The app loads that file at startup.
+Serve the models named in `appsettings.json` (`Omlx:EmbeddingModel` and the chat models in `Omlx:ChatModels`). The default chat model is `Omlx:ChatModel` (`Qwen3.8-27B-4bit`). On the Search page you can switch among the models in `Omlx:ChatModels`. Folder names under the oMLX model directory are the model ids. Default base URL is `http://127.0.0.1:8000`. If the server requires a key, put `Omlx_api_key=...` in a `.env` file at the repo root. The app loads that file at startup.
 
 ### Ollama
 

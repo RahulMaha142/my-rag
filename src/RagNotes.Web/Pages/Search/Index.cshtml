@@ -8,6 +8,15 @@
 
 <form method="post" class="mb-4">
     <div class="mb-3">
+        <label asp-for="ChatModel" class="form-label"></label>
+        <select asp-for="ChatModel" class="form-select">
+            @foreach (var chatModel in Model.ChatModels)
+            {
+                <option value="@chatModel">@chatModel</option>
+            }
+        </select>
+    </div>
+    <div class="mb-3">
         <label asp-for="Query" class="form-label"></label>
         <input asp-for="Query"
                class="form-control"
@@ -22,7 +31,7 @@
 {
     @if (!string.IsNullOrWhiteSpace(Model.Answer))
     {
-        <h2>Answer</h2>
+        <h2>Answer <span class="text-muted fs-6">@Model.AnswerModel</span></h2>
         <div class="mb-4" style="white-space: pre-wrap;">@Model.Answer</div>
     }
 

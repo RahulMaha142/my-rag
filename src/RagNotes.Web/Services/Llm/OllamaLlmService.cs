@@ -16,7 +16,10 @@ public class OllamaLlmService : ILlmService
         _options = options.Value;
     }
 
-    public async Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateAsync(
+        string prompt,
+        string? model = null,
+        CancellationToken cancellationToken = default)
     {
         // qwen3.* models default to chain-of-thought ("thinking").
         // Without think:false they often exhaust tokens before writing response.
