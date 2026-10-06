@@ -11,6 +11,10 @@ a {
   color: #0077cc;
 }
 
+[data-theme="dark"] a {
+  color: #8ec7ff;
+}
+
 .btn-primary {
   color: #fff;
   background-color: #1b6ec2;
