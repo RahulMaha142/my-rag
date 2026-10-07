@@ -85,6 +85,7 @@ public class DocumentIndexingServiceTests
         public Task<IReadOnlyList<SearchHit>> SearchAsync(
             float[] embedding,
             int topK = 5,
+            DocumentChunkFilter? documentFilter = null,
             CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<SearchHit>>([]);
     }

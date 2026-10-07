@@ -15,5 +15,6 @@ public interface IVectorStore
     Task<IReadOnlyList<SearchHit>> SearchAsync(
         float[] embedding,
         int topK = 5,
+        DocumentChunkFilter? documentFilter = null,
         CancellationToken cancellationToken = default);
 }

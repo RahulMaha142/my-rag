@@ -213,3 +213,32 @@ body {
 [data-theme="dark"] blockquote {
   color: var(--page-fg);
 }
+
+.document-filter-toggle {
+  background-color: #fff;
+  color: #212529;
+}
+
+.document-filter-menu {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+[data-theme="dark"] .document-filter-toggle {
+  background-color: #121418;
+  color: var(--page-fg);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .document-filter-toggle:hover,
+[data-theme="dark"] .document-filter-toggle:focus {
+  background-color: #2a313a;
+  color: var(--page-fg);
+  border-color: #6c757d;
+}
+
+[data-theme="dark"] .dropdown-menu {
+  background-color: var(--surface);
+  color: var(--page-fg);
+  border-color: var(--border);
+}

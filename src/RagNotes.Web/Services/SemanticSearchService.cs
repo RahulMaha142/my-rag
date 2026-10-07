@@ -19,9 +19,14 @@ public class SemanticSearchService
     public async Task<IReadOnlyList<SearchHit>> SearchAsync(
         string query,
         int topK = 5,
+        DocumentChunkFilter? documentFilter = null,
         CancellationToken cancellationToken = default)
     {
         var embedding = await _embeddings.EmbedAsync(query, cancellationToken);
-        return await _vectorStore.SearchAsync(embedding, topK, cancellationToken);
+        return await _vectorStore.SearchAsync(
+            embedding,
+            topK,
+            documentFilter,
+            cancellationToken);
     }
 }

@@ -88,11 +88,13 @@ public class QdrantVectorStore : IVectorStore
     public async Task<IReadOnlyList<SearchHit>> SearchAsync(
         float[] embedding,
         int topK = 5,
+        DocumentChunkFilter? documentFilter = null,
         CancellationToken cancellationToken = default)
     {
         var points = await _client.QueryAsync(
             collectionName: _options.CollectionName,
             query: embedding,
+            filter: ToFilter(documentFilter),
             limit: (ulong)topK,
             payloadSelector: true,
             cancellationToken: cancellationToken);
@@ -103,5 +105,23 @@ public class QdrantVectorStore : IVectorStore
             FileName: point.Payload["fileName"].StringValue,
             ChunkIndex: (int)point.Payload["chunkIndex"].IntegerValue,
             Text: point.Payload["text"].StringValue)).ToList();
+    }
+
+    private static Filter? ToFilter(DocumentChunkFilter? documentFilter)
+    {
+        if (documentFilter is null || documentFilter.DocumentIds.Count == 0)
+            return null;
+
+        var filter = new Filter();
+        foreach (var id in documentFilter.DocumentIds)
+        {
+            var condition = Match("documentId", id);
+            if (documentFilter.Mode == DocumentFilterMode.Exclude)
+                filter.MustNot.Add(condition);
+            else
+                filter.Should.Add(condition);
+        }
+
+        return filter;
     }
 }

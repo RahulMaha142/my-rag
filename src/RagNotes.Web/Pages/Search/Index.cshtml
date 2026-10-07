@@ -7,7 +7,8 @@
 <h1>Search</h1>
 
 <form method="post" class="mb-4">
-    <div class="mb-3">
+    <div class="row mb-3">
+    <div class="col-md-4 mb-3 mb-md-0">
         <label asp-for="ChatModel" class="form-label"></label>
         <select asp-for="ChatModel" class="form-select">
             @foreach (var chatModel in Model.ChatModels)
@@ -15,6 +16,54 @@
                 <option value="@chatModel">@chatModel</option>
             }
         </select>
+    </div>
+    <div class="col-md-4 mb-3 mb-md-0">
+        <label asp-for="FilterMode" class="form-label"></label>
+        <select asp-for="FilterMode" class="form-select">
+            <option value="include">Only selected documents</option>
+            <option value="exclude">Exclude selected documents</option>
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" id="document-filter-label">Documents</label>
+        <div class="dropdown">
+            <button type="button"
+                    class="btn btn-outline-secondary dropdown-toggle document-filter-toggle w-100 text-start"
+                    id="document-filter-toggle"
+                    data-bs-toggle="dropdown"
+                    data-bs-auto-close="outside"
+                    aria-expanded="false"
+                    aria-labelledby="document-filter-label document-filter-summary">
+                <span id="document-filter-summary">All documents</span>
+            </button>
+            <div class="dropdown-menu document-filter-menu w-100 p-2" aria-labelledby="document-filter-toggle">
+                @if (Model.Documents.Count == 0)
+                {
+                    <div class="text-muted px-2">No documents uploaded.</div>
+                }
+                else
+                {
+                    @foreach (var document in Model.Documents)
+                    {
+                        var inputId = $"document-{document.Id}";
+                        <div class="form-check">
+                            <input class="form-check-input document-filter-check"
+                                   type="checkbox"
+                                   name="SelectedDocumentIds"
+                                   value="@document.Id"
+                                   id="@inputId"
+                                   @(Model.SelectedDocumentIds.Contains(document.Id) ? "checked" : null) />
+                            <label class="form-check-label" for="@inputId">
+                                @document.FileName
+                                <span class="text-muted">@document.CreatedAt.ToLocalTime().ToString("g")</span>
+                            </label>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+        <div class="form-text">Leave every box unchecked to search all documents.</div>
+    </div>
     </div>
     <div class="mb-3">
         <label asp-for="Query" class="form-label"></label>
@@ -35,7 +84,7 @@
         <div class="mb-4" style="white-space: pre-wrap;">@Model.Answer</div>
     }
 
-    <h2>Sources</h2>
+    <h2>Sources <span class="text-muted fs-6">@Model.AppliedFilterSummary</span></h2>
 
     @if (Model.Results.Count == 0)
     {
@@ -56,4 +105,39 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var mode = document.getElementById("FilterMode");
+            var summary = document.getElementById("document-filter-summary");
+            var checks = document.querySelectorAll(".document-filter-check");
+            if (!mode || !summary) {
+                return;
+            }
+
+            function updateSummary() {
+                var count = 0;
+                checks.forEach(function (box) {
+                    if (box.checked) {
+                        count++;
+                    }
+                });
+
+                if (count === 0) {
+                    summary.textContent = "All documents";
+                    return;
+                }
+
+                var noun = count === 1 ? "document" : "documents";
+                summary.textContent = mode.value === "exclude"
+                    ? "Excluding " + count + " " + noun
+                    : count + " " + noun;
+            }
+
+            mode.addEventListener("change", updateSummary);
+            checks.forEach(function (box) {
+                box.addEventListener("change", updateSummary);
+            });
+            updateSummary();
+        })();
+    </script>
 }
