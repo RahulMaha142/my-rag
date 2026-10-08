@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using RagNotes.Web.Options;
@@ -47,6 +48,18 @@ public class OllamaLlmService : ILlmService
         }
 
         return text;
+    }
+
+    public async IAsyncEnumerable<LlmEvent> StreamAsync(
+        string prompt,
+        string? model,
+        bool enableThinking,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        _ = enableThinking;
+        var text = await GenerateAsync(prompt, model, cancellationToken);
+        yield return new LlmTextEvent(LlmTextKind.Answer, text);
+        yield return new LlmCompletedEvent("stop");
     }
 
     private static string? FirstNonEmpty(params string?[] values)

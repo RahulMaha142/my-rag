@@ -6,7 +6,10 @@
 
 <h1>Search</h1>
 
-<form method="post" class="mb-4">
+<form method="post"
+      id="search-form"
+      class="mb-4"
+      data-stream-url="@Url.Page("/Search/Index", "Stream")">
     <div class="row mb-3">
     <div class="col-md-4 mb-3 mb-md-0">
         <label asp-for="ChatModel" class="form-label"></label>
@@ -16,6 +19,10 @@
                 <option value="@chatModel">@chatModel</option>
             }
         </select>
+        <div class="form-check mt-2">
+            <input asp-for="EnableThinking" class="form-check-input" />
+            <label asp-for="EnableThinking" class="form-check-label"></label>
+        </div>
     </div>
     <div class="col-md-4 mb-3 mb-md-0">
         <label asp-for="FilterMode" class="form-label"></label>
@@ -52,6 +59,7 @@
                                    name="SelectedDocumentIds"
                                    value="@document.Id"
                                    id="@inputId"
+                                   data-file-name="@document.FileName"
                                    @(Model.SelectedDocumentIds.Contains(document.Id) ? "checked" : null) />
                             <label class="form-check-label" for="@inputId">
                                 @document.FileName
@@ -73,34 +81,69 @@
                autofocus />
         <span asp-validation-for="Query" class="text-danger"></span>
     </div>
-    <button type="submit" class="btn btn-primary">Ask</button>
+    <button type="submit" class="btn btn-primary" id="search-submit">Ask</button>
+    <button type="button" class="btn btn-outline-secondary d-none" id="search-stop">Stop</button>
 </form>
+
+<div id="search-live" class="d-none" aria-live="polite">
+    <p id="search-status" class="text-muted d-none"></p>
+    <div id="search-answer-block" class="d-none">
+        <h2>Answer <span id="search-answer-model" class="text-muted fs-6"></span></h2>
+        <details id="search-thinking" class="mb-3 d-none">
+            <summary>Thinking</summary>
+            <div id="search-thinking-text" class="mt-2" style="white-space: pre-wrap;"></div>
+        </details>
+        <div id="search-answer" class="mb-2" style="white-space: pre-wrap;"></div>
+        <p id="search-cutoff" class="text-muted d-none">The reply was cut off.</p>
+    </div>
+    <p id="search-error" class="text-danger d-none"></p>
+    <h2>Sources <span id="search-filter-summary" class="text-muted fs-6"></span></h2>
+    <div id="search-sources"></div>
+</div>
 
 @if (Model.HasSearched)
 {
-    @if (!string.IsNullOrWhiteSpace(Model.Answer))
-    {
-        <h2>Answer <span class="text-muted fs-6">@Model.AnswerModel</span></h2>
-        <div class="mb-4" style="white-space: pre-wrap;">@Model.Answer</div>
-    }
-
-    <h2>Sources <span class="text-muted fs-6">@Model.AppliedFilterSummary</span></h2>
-
-    @if (Model.Results.Count == 0)
-    {
-        <p>No matching chunks found. Upload and index documents first.</p>
-    }
-    else
-    {
-        @foreach (var hit in Model.Results)
+    <div id="search-results">
+        @if (!string.IsNullOrWhiteSpace(Model.Answer) ||
+             !string.IsNullOrWhiteSpace(Model.Thinking) ||
+             Model.AnswerCutOff)
         {
-            <div class="mb-4">
-                <div class="fw-bold">@hit.Score.ToString("0.00")</div>
-                <div class="text-muted mb-1">@hit.FileName — Chunk @hit.ChunkIndex</div>
-                <blockquote class="border-start border-3 ps-3 mb-0">@hit.Text</blockquote>
-            </div>
+            <h2>Answer <span class="text-muted fs-6">@Model.AnswerModel</span></h2>
+            @if (!string.IsNullOrWhiteSpace(Model.Thinking))
+            {
+                <details class="mb-3" open>
+                    <summary>Thinking</summary>
+                    <div class="mt-2" style="white-space: pre-wrap;">@Model.Thinking</div>
+                </details>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Answer))
+            {
+                <div class="mb-2" style="white-space: pre-wrap;">@Model.Answer</div>
+            }
+            @if (Model.AnswerCutOff)
+            {
+                <p class="text-muted">The reply was cut off.</p>
+            }
         }
-    }
+
+        <h2>Sources <span class="text-muted fs-6">@Model.AppliedFilterSummary</span></h2>
+
+        @if (Model.Results.Count == 0)
+        {
+            <p>No matching chunks found. Upload and index documents first.</p>
+        }
+        else
+        {
+            @foreach (var hit in Model.Results)
+            {
+                <div class="mb-4">
+                    <div class="fw-bold">@hit.Score.ToString("0.00")</div>
+                    <div class="text-muted mb-1">@hit.FileName — Chunk @hit.ChunkIndex</div>
+                    <blockquote class="border-start border-3 ps-3 mb-0">@hit.Text</blockquote>
+                </div>
+            }
+        }
+    </div>
 }
 
 @section Scripts {
@@ -138,6 +181,218 @@
                 box.addEventListener("change", updateSummary);
             });
             updateSummary();
+        })();
+    </script>
+    <script>
+        (function () {
+            var form = document.getElementById("search-form");
+            var submitBtn = document.getElementById("search-submit");
+            var stopBtn = document.getElementById("search-stop");
+            if (!form || !submitBtn || !stopBtn || !window.fetch || !window.AbortController) {
+                return;
+            }
+
+            var live = document.getElementById("search-live");
+            var status = document.getElementById("search-status");
+            var answerBlock = document.getElementById("search-answer-block");
+            var answerModel = document.getElementById("search-answer-model");
+            var thinking = document.getElementById("search-thinking");
+            var thinkingText = document.getElementById("search-thinking-text");
+            var answer = document.getElementById("search-answer");
+            var cutoff = document.getElementById("search-cutoff");
+            var error = document.getElementById("search-error");
+            var filterSummary = document.getElementById("search-filter-summary");
+            var sources = document.getElementById("search-sources");
+            var controller = null;
+
+            function setStatus(text) {
+                status.textContent = text || "";
+                status.classList.toggle("d-none", !text);
+            }
+
+            function showError(text) {
+                error.textContent = text;
+                error.classList.remove("d-none");
+                setStatus("");
+            }
+
+            function filterLabel() {
+                var modeEl = document.getElementById("FilterMode");
+                var names = [];
+                document.querySelectorAll(".document-filter-check:checked").forEach(function (box) {
+                    names.push(box.getAttribute("data-file-name") || ("document " + box.value));
+                });
+                if (names.length === 0) {
+                    return "All documents";
+                }
+                var list = names.join(", ");
+                return modeEl && modeEl.value === "exclude"
+                    ? "Excluding " + list
+                    : "Only " + list;
+            }
+
+            function renderSources(hits) {
+                sources.replaceChildren();
+                if (!hits || hits.length === 0) {
+                    var empty = document.createElement("p");
+                    empty.textContent = "No matching chunks found. Upload and index documents first.";
+                    sources.appendChild(empty);
+                    return;
+                }
+
+                hits.forEach(function (hit) {
+                    var block = document.createElement("div");
+                    block.className = "mb-4";
+                    var score = document.createElement("div");
+                    score.className = "fw-bold";
+                    var value = Number(hit.score);
+                    score.textContent = Number.isFinite(value) ? value.toFixed(2) : "";
+                    var meta = document.createElement("div");
+                    meta.className = "text-muted mb-1";
+                    meta.textContent = (hit.fileName || "") + " — Chunk " + hit.chunkIndex;
+                    var quote = document.createElement("blockquote");
+                    quote.className = "border-start border-3 ps-3 mb-0";
+                    quote.textContent = hit.text || "";
+                    block.appendChild(score);
+                    block.appendChild(meta);
+                    block.appendChild(quote);
+                    sources.appendChild(block);
+                });
+            }
+
+            function resetLive() {
+                var previous = document.getElementById("search-results");
+                if (previous) {
+                    previous.classList.add("d-none");
+                }
+                live.classList.remove("d-none");
+                setStatus("");
+                answerBlock.classList.add("d-none");
+                var model = document.getElementById("ChatModel");
+                answerModel.textContent = model && model.selectedOptions.length
+                    ? model.selectedOptions[0].text
+                    : "";
+                thinking.classList.add("d-none");
+                thinking.open = false;
+                thinkingText.textContent = "";
+                answer.textContent = "";
+                cutoff.classList.add("d-none");
+                error.classList.add("d-none");
+                error.textContent = "";
+                filterSummary.textContent = filterLabel();
+                sources.replaceChildren();
+            }
+
+            function handleEvent(evt) {
+                if (!evt || !evt.type) {
+                    return;
+                }
+                if (evt.type === "status") {
+                    setStatus(evt.text || "");
+                    if (evt.text === "Generating…") {
+                        answerBlock.classList.remove("d-none");
+                    }
+                    return;
+                }
+                if (evt.type === "sources") {
+                    renderSources(evt.hits || []);
+                    return;
+                }
+                if (evt.type === "thinking") {
+                    answerBlock.classList.remove("d-none");
+                    thinking.classList.remove("d-none");
+                    thinking.open = true;
+                    thinkingText.textContent += evt.text || "";
+                    return;
+                }
+                if (evt.type === "token") {
+                    answerBlock.classList.remove("d-none");
+                    answer.textContent += evt.text || "";
+                    return;
+                }
+                if (evt.type === "done") {
+                    setStatus("");
+                    if (String(evt.finishReason || "").toLowerCase() === "length") {
+                        answerBlock.classList.remove("d-none");
+                        cutoff.classList.remove("d-none");
+                    }
+                    return;
+                }
+                if (evt.type === "error") {
+                    showError(evt.text || "Search failed.");
+                }
+            }
+
+            function isValid() {
+                if (window.jQuery && jQuery(form).valid) {
+                    return jQuery(form).valid();
+                }
+                var query = document.getElementById("Query");
+                return !!query && query.value.trim().length > 0;
+            }
+
+            async function readStream(response) {
+                if (!response.ok || !response.body) {
+                    throw new Error("Search failed (" + response.status + ").");
+                }
+                var reader = response.body.getReader();
+                var decoder = new TextDecoder();
+                var buffer = "";
+                while (true) {
+                    var step = await reader.read();
+                    if (step.done) {
+                        break;
+                    }
+                    buffer += decoder.decode(step.value, { stream: true });
+                    var lines = buffer.split("\n");
+                    buffer = lines.pop() || "";
+                    lines.forEach(function (line) {
+                        var trimmed = line.trim();
+                        if (!trimmed) {
+                            return;
+                        }
+                        handleEvent(JSON.parse(trimmed));
+                    });
+                }
+                var rest = buffer.trim();
+                if (rest) {
+                    handleEvent(JSON.parse(rest));
+                }
+            }
+
+            form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                if (controller || !isValid()) {
+                    return;
+                }
+                controller = new AbortController();
+                resetLive();
+                setStatus("Searching notes…");
+                submitBtn.classList.add("d-none");
+                stopBtn.classList.remove("d-none");
+                fetch(form.getAttribute("data-stream-url"), {
+                    method: "POST",
+                    body: new FormData(form),
+                    headers: { "Accept": "application/x-ndjson" },
+                    signal: controller.signal
+                }).then(readStream).catch(function (err) {
+                    if (err && err.name === "AbortError") {
+                        setStatus("Stopped.");
+                        return;
+                    }
+                    showError(err && err.message ? err.message : "Search failed.");
+                }).finally(function () {
+                    controller = null;
+                    submitBtn.classList.remove("d-none");
+                    stopBtn.classList.add("d-none");
+                });
+            });
+
+            stopBtn.addEventListener("click", function () {
+                if (controller) {
+                    controller.abort();
+                }
+            });
         })();
     </script>
 }
