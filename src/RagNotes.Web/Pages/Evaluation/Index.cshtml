@@ -1,0 +1,144 @@
+@page
+@using RagNotes.Web.Services.Evaluation
+@model RagNotes.Web.Pages.Evaluation.IndexModel
+@{
+    ViewData["Title"] = "Evaluation";
+}
+
+<h1>Evaluation</h1>
+
+<p>
+    Runs @Model.AnswerableCount answerable questions and @Model.DistractorCount distractors
+    against the six Federalist essays already in the collection. This scores retrieval only.
+    Embedding each question can take about a minute.
+</p>
+
+<form method="post" id="evaluation-form" class="mb-4">
+    <button type="submit" class="btn btn-primary" id="evaluation-submit">Run evaluation</button>
+</form>
+
+@if (Model.HasRun && Model.Result is not null)
+{
+    var result = Model.Result;
+
+    @if (result.MissingFiles.Count > 0)
+    {
+        <div class="alert alert-warning">
+            These essays are not uploaded, so questions that expect them were not scored:
+            @string.Join(", ", result.MissingFiles)
+        </div>
+    }
+
+    @if (result.ScoredCount == 0)
+    {
+        <h2>No answerable questions were scored</h2>
+        <p>Upload the Federalist essays on the Documents page, then run the evaluation again.</p>
+    }
+    else
+    {
+        <h2>@result.PassCount of @result.ScoredCount answerable questions retrieved the expected passage</h2>
+        @if (result.NotIndexedCount > 0)
+        {
+            <p class="text-muted">@result.NotIndexedCount questions were not scored because their file is not uploaded.</p>
+        }
+    }
+
+    <div class="table-responsive">
+        <table class="table align-top">
+            <thead>
+                <tr>
+                    <th>Result</th>
+                    <th>Question</th>
+                    <th>Expected file</th>
+                    <th>Top hits</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in result.Answerable)
+                {
+                    var outcomeClass = item.Outcome switch
+                    {
+                        EvalOutcome.Passed => "text-success",
+                        EvalOutcome.Failed => "text-danger",
+                        _ => "text-muted"
+                    };
+                    <tr>
+                        <td class="@outcomeClass">@IndexModel.OutcomeLabel(item.Outcome)</td>
+                        <td>@item.Question.Question</td>
+                        <td>@string.Join(", ", item.Question.ExpectedFiles)</td>
+                        <td>
+                            @if (item.Hits.Count == 0)
+                            {
+                                <span class="text-muted">No hits</span>
+                            }
+                            else
+                            {
+                                @foreach (var hit in item.Hits)
+                                {
+                                    <div class="mb-2">
+                                        <span class="fw-bold">@hit.Score.ToString("0.00")</span>
+                                        <span class="text-muted">@hit.FileName — Chunk @hit.ChunkIndex</span>
+                                        <div>@IndexModel.Snippet(hit)</div>
+                                    </div>
+                                }
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Distractors</h2>
+    <p class="text-muted">These questions are not answered by the six essays. They are not marked pass or fail.</p>
+    <div class="table-responsive">
+        <table class="table align-top">
+            <thead>
+                <tr>
+                    <th>Question</th>
+                    <th>Top hit</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in result.Distractors)
+                {
+                    var top = item.Hits.FirstOrDefault();
+                    <tr>
+                        <td>@item.Question.Question</td>
+                        <td>
+                            @if (top is null)
+                            {
+                                <span class="text-muted">No hits</span>
+                            }
+                            else
+                            {
+                                <div>
+                                    <span class="fw-bold">@top.Score.ToString("0.00")</span>
+                                    <span class="text-muted">@top.FileName — Chunk @top.ChunkIndex</span>
+                                </div>
+                                <div>@IndexModel.Snippet(top)</div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var form = document.getElementById("evaluation-form");
+            var button = document.getElementById("evaluation-submit");
+            if (!form || !button) {
+                return;
+            }
+
+            form.addEventListener("submit", function () {
+                button.disabled = true;
+                button.textContent = "Running…";
+            });
+        })();
+    </script>
+}

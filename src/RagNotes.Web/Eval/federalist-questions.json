@@ -1,0 +1,142 @@
+[
+  {
+    "id": "no1-choice",
+    "question": "How does Hamilton say societies of men might establish good government, rather than depending on accident and force?",
+    "expectedFiles": ["Federalist No. 1.txt"],
+    "mustContain": "reflection and choice",
+    "answerable": true
+  },
+  {
+    "id": "no1-date",
+    "question": "When was Federalist No. 1 published in the Independent Journal?",
+    "expectedFiles": ["Federalist No. 1.txt"],
+    "mustContain": "October 27, 1787",
+    "answerable": true
+  },
+  {
+    "id": "no1-misfortune",
+    "question": "What does Hamilton say a wrong choice in this crisis may deserve to be considered?",
+    "expectedFiles": ["Federalist No. 1.txt"],
+    "mustContain": "the general misfortune of mankind",
+    "answerable": true
+  },
+  {
+    "id": "no10-faction",
+    "question": "What does Madison say a well constructed Union tends to break and control?",
+    "expectedFiles": ["Federalist No. 10.txt"],
+    "mustContain": "violence of faction",
+    "answerable": true
+  },
+  {
+    "id": "no10-democracy",
+    "question": "What does Madison mean by a pure democracy?",
+    "expectedFiles": ["Federalist No. 10.txt"],
+    "mustContain": "assemble and administer the government in person",
+    "answerable": true
+  },
+  {
+    "id": "no10-republic",
+    "question": "What scheme does Madison say distinguishes a republic from a pure democracy?",
+    "expectedFiles": ["Federalist No. 10.txt"],
+    "mustContain": "scheme of representation",
+    "answerable": true
+  },
+  {
+    "id": "no10-causes",
+    "question": "Where does Madison say the latent causes of faction are sown?",
+    "expectedFiles": ["Federalist No. 10.txt"],
+    "mustContain": "sown in the nature of man",
+    "answerable": true
+  },
+  {
+    "id": "no51-ambition",
+    "question": "What does Madison say must be made to counteract ambition?",
+    "expectedFiles": ["Federalist No. 51.txt"],
+    "mustContain": "Ambition must be made to counteract ambition",
+    "answerable": true
+  },
+  {
+    "id": "no51-angels",
+    "question": "Under what condition does Madison say no government would be necessary?",
+    "expectedFiles": ["Federalist No. 51.txt"],
+    "mustContain": "If men were angels, no government would be necessary",
+    "answerable": true
+  },
+  {
+    "id": "no51-check",
+    "question": "When the several offices are divided, what does Madison say each should be on the other?",
+    "expectedFiles": ["Federalist No. 51.txt"],
+    "mustContain": "a check on the other",
+    "answerable": true
+  },
+  {
+    "id": "no68-electors",
+    "question": "Who does Hamilton say should choose the president, instead of any preestablished body?",
+    "expectedFiles": ["Federalist No. 68.txt"],
+    "mustContain": "men chosen by the people for the special purpose",
+    "answerable": true
+  },
+  {
+    "id": "no68-excellent",
+    "question": "How does Hamilton describe the manner of electing the president if it is not perfect?",
+    "expectedFiles": ["Federalist No. 68.txt"],
+    "mustContain": "it is at least excellent",
+    "answerable": true
+  },
+  {
+    "id": "no70-feeble",
+    "question": "What does a feeble executive imply, according to Hamilton?",
+    "expectedFiles": ["Federalist No. 70.txt"],
+    "mustContain": "A feeble Executive implies a feeble execution of the government",
+    "answerable": true
+  },
+  {
+    "id": "no70-plurality",
+    "question": "How can the unity of the executive be destroyed by vesting power in several magistrates of equal dignity?",
+    "expectedFiles": ["Federalist No. 70.txt"],
+    "mustContain": "two or more magistrates of equal dignity and authority",
+    "answerable": true
+  },
+  {
+    "id": "no78-tenure",
+    "question": "For how long do judges appointed by the United States hold their offices under the plan of the convention?",
+    "expectedFiles": ["Federalist No. 78.txt"],
+    "mustContain": "during good behavior",
+    "answerable": true
+  },
+  {
+    "id": "moon-travel",
+    "question": "What is the company's policy on moon travel?",
+    "expectedFiles": [],
+    "mustContain": null,
+    "answerable": false
+  },
+  {
+    "id": "voting-age",
+    "question": "What voting age do these essays set for federal elections?",
+    "expectedFiles": [],
+    "mustContain": null,
+    "answerable": false
+  },
+  {
+    "id": "income-tax",
+    "question": "Which amendment authorizes a federal income tax?",
+    "expectedFiles": [],
+    "mustContain": null,
+    "answerable": false
+  },
+  {
+    "id": "bill-of-rights",
+    "question": "What does Federalist No. 84 say about a bill of rights?",
+    "expectedFiles": [],
+    "mustContain": null,
+    "answerable": false
+  },
+  {
+    "id": "senate-age",
+    "question": "How old must a person be to serve in the Senate?",
+    "expectedFiles": [],
+    "mustContain": null,
+    "answerable": false
+  }
+]

@@ -6,6 +6,7 @@ using RagNotes.Web.Data;
 using RagNotes.Web.Options;
 using RagNotes.Web.Services;
 using RagNotes.Web.Services.Chunking;
+using RagNotes.Web.Services.Evaluation;
 using RagNotes.Web.Services.Embeddings;
 using RagNotes.Web.Services.Llm;
 using RagNotes.Web.Services.VectorStore;
@@ -74,6 +75,8 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<IVectorStore, QdrantVectorStore>();
 builder.Services.AddScoped<DocumentIndexingService>();
 builder.Services.AddScoped<SemanticSearchService>();
+builder.Services.AddSingleton<EvalQuestionCatalog>();
+builder.Services.AddScoped<EvaluationRunner>();
 
 var app = builder.Build();
 
