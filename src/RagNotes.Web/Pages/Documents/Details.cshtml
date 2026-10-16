@@ -92,7 +92,10 @@ else
 
 @if (Model.MissingEmbeddingModels.Count > 0)
 {
-    <form method="post" asp-page-handler="IndexIntoModel" class="row g-2 align-items-end mb-4">
+    <form method="post"
+          asp-page-handler="IndexIntoModel"
+          class="row g-2 align-items-end mb-4"
+          data-busy-label="Indexing into model…">
         <input type="hidden" name="id" value="@Model.Document.Id" />
         <div class="col-md-6">
             <label asp-for="EmbeddingModel" class="form-label"></label>
@@ -109,13 +112,17 @@ else
             <button type="submit" class="btn btn-outline-primary">Index into this model</button>
         </div>
     </form>
+    <p class="text-muted d-none" data-busy-status aria-live="polite"></p>
 }
 
 <h2 class="mt-4">Chunking</h2>
 <p class="text-muted">
     Saving reindexes this document in every embedding model it is already attached to.
 </p>
-<form method="post" asp-page-handler="Reindex" class="mb-4">
+<form method="post"
+      asp-page-handler="Reindex"
+      class="mb-4"
+      data-busy-label="Reindexing…">
     <input type="hidden" name="id" value="@Model.Document.Id" />
     <div class="row mb-3">
         <div class="col-md-4">
@@ -156,6 +163,7 @@ else
     </div>
     <button type="submit" class="btn btn-primary">Save and reindex</button>
 </form>
+<p class="text-muted d-none" data-busy-status aria-live="polite"></p>
 
 <h2 class="mt-4">
     Chunks

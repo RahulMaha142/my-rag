@@ -13,7 +13,10 @@
     This scores retrieval only. Embedding each question can take about a minute.
 </p>
 
-<form method="post" id="evaluation-form" class="mb-4">
+<form method="post"
+      id="evaluation-form"
+      class="mb-4"
+      data-busy-label="Running evaluation…">
     <div class="mb-3" style="max-width: 28rem;">
         <label asp-for="EmbeddingModel" class="form-label"></label>
         <select asp-for="EmbeddingModel" class="form-select">
@@ -27,6 +30,7 @@
     </div>
     <button type="submit" class="btn btn-primary" id="evaluation-submit">Run evaluation</button>
 </form>
+<p class="text-muted d-none" data-busy-status aria-live="polite"></p>
 
 @if (Model.HasRun && Model.Result is not null)
 {
@@ -139,19 +143,3 @@
     </div>
 }
 
-@section Scripts {
-    <script>
-        (function () {
-            var form = document.getElementById("evaluation-form");
-            var button = document.getElementById("evaluation-submit");
-            if (!form || !button) {
-                return;
-            }
-
-            form.addEventListener("submit", function () {
-                button.disabled = true;
-                button.textContent = "Running…";
-            });
-        })();
-    </script>
-}

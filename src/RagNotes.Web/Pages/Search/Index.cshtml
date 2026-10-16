@@ -98,7 +98,13 @@
 </form>
 
 <div id="search-live" class="d-none" aria-live="polite">
-    <p id="search-status" class="text-muted d-none"></p>
+    <p id="search-status-row" class="text-muted d-none mb-2">
+        <span id="search-status-spinner"
+              class="spinner-border spinner-border-sm me-2"
+              role="status"
+              aria-hidden="true"></span>
+        <span id="search-status"></span>
+    </p>
     <div id="search-answer-block" class="d-none">
         <h2>Answer <span id="search-answer-model" class="text-muted fs-6"></span></h2>
         <details id="search-thinking" class="mb-3 d-none">
@@ -205,7 +211,9 @@
             }
 
             var live = document.getElementById("search-live");
+            var statusRow = document.getElementById("search-status-row");
             var status = document.getElementById("search-status");
+            var statusSpinner = document.getElementById("search-status-spinner");
             var answerBlock = document.getElementById("search-answer-block");
             var answerModel = document.getElementById("search-answer-model");
             var thinking = document.getElementById("search-thinking");
@@ -217,9 +225,13 @@
             var sources = document.getElementById("search-sources");
             var controller = null;
 
-            function setStatus(text) {
+            function setStatus(text, spinning) {
+                var show = !!text;
                 status.textContent = text || "";
-                status.classList.toggle("d-none", !text);
+                statusRow.classList.toggle("d-none", !show);
+                if (statusSpinner) {
+                    statusSpinner.classList.toggle("d-none", !show || spinning === false);
+                }
             }
 
             function showError(text) {
@@ -389,7 +401,7 @@
                     signal: controller.signal
                 }).then(readStream).catch(function (err) {
                     if (err && err.name === "AbortError") {
-                        setStatus("Stopped.");
+                        setStatus("Stopped.", false);
                         return;
                     }
                     showError(err && err.message ? err.message : "Search failed.");
