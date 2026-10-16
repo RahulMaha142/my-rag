@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Qdrant.Client;
 using RagNotes.Web.Data;
+using RagNotes.Web.Models;
 using RagNotes.Web.Options;
 using RagNotes.Web.Services;
 using RagNotes.Web.Services.Chunking;
@@ -29,6 +30,7 @@ builder.Services.Configure<OmlxOptions>(
     builder.Configuration.GetSection(OmlxOptions.SectionName));
 builder.Services.Configure<QdrantOptions>(
     builder.Configuration.GetSection(QdrantOptions.SectionName));
+builder.Services.AddSingleton<IEmbeddingModelCatalog, EmbeddingModelCatalogService>();
 
 var provider = builder.Configuration[$"{InferenceOptions.SectionName}:Provider"] ?? "Omlx";
 switch (provider.Trim().ToLowerInvariant())
@@ -82,8 +84,17 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
+    var db = scope.ServiceProvider.GetRequiredService<RagNotesDbContext>();
+    await db.Database.MigrateAsync();
+
+    var catalog = scope.ServiceProvider.GetRequiredService<IEmbeddingModelCatalog>();
+    await BackfillEmbeddingIndexesAsync(db, catalog.DefaultModel);
+
     var vectorStore = scope.ServiceProvider.GetRequiredService<IVectorStore>();
-    await vectorStore.EnsureCollectionAsync();
+    var models = catalog.AvailableModels
+        .Where(model => !string.IsNullOrWhiteSpace(model.Id) && model.VectorSize > 0)
+        .Select(model => (model.Id, model.VectorSize));
+    await vectorStore.EnsureAllCollectionsAsync(models);
 }
 
 if (!app.Environment.IsDevelopment())
@@ -102,6 +113,35 @@ app.UseAuthorization();
 app.MapRazorPages();
 
 app.Run();
+
+static async Task BackfillEmbeddingIndexesAsync(RagNotesDbContext db, string defaultModel)
+{
+    if (string.IsNullOrWhiteSpace(defaultModel))
+        return;
+
+    var model = defaultModel.Trim();
+    var documentIds = await db.Documents
+        .Where(document => !document.EmbeddingIndexes.Any())
+        .Select(document => document.Id)
+        .ToListAsync();
+
+    if (documentIds.Count == 0)
+        return;
+
+    var now = DateTime.UtcNow;
+    foreach (var documentId in documentIds)
+    {
+        db.DocumentEmbeddingIndexes.Add(new DocumentEmbeddingIndex
+        {
+            DocumentId = documentId,
+            EmbeddingModel = model,
+            ChunkCount = 0,
+            IndexedAt = now
+        });
+    }
+
+    await db.SaveChangesAsync();
+}
 
 static void LoadEnvFile()
 {

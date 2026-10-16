@@ -16,13 +16,23 @@ public class OmlxEmbeddingService : IEmbeddingService
         _options = options.Value;
     }
 
-    public async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
+    public async Task<float[]> EmbedAsync(
+        string text,
+        string model,
+        CancellationToken cancellationToken = default)
     {
+        var embeddingModel = _options.ResolveEmbeddingModel(model);
+        if (string.IsNullOrWhiteSpace(embeddingModel))
+        {
+            throw new InvalidOperationException(
+                "No embedding model was configured for oMLX.");
+        }
+
         var response = await _http.PostAsJsonAsync(
             "/v1/embeddings",
             new
             {
-                model = _options.EmbeddingModel,
+                model = embeddingModel,
                 input = text,
                 encoding_format = "float"
             },
@@ -33,7 +43,7 @@ public class OmlxEmbeddingService : IEmbeddingService
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new HttpRequestException(
                 $"oMLX embeddings failed ({(int)response.StatusCode}): {body}. " +
-                $"Model '{_options.EmbeddingModel}' must be loaded in oMLX.");
+                $"Model '{embeddingModel}' must be loaded in oMLX.");
         }
 
         var result = await response.Content

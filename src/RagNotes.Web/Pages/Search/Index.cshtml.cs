@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using RagNotes.Web.Data;
 using RagNotes.Web.Options;
 using RagNotes.Web.Services;
+using RagNotes.Web.Services.Embeddings;
 using RagNotes.Web.Services.Llm;
 using RagNotes.Web.Services.VectorStore;
 
@@ -17,6 +18,7 @@ namespace RagNotes.Web.Pages.Search;
 public class IndexModel : PageModel
 {
     public const string ChatModelCookieName = "rag-chat-model";
+    public const string EmbeddingModelCookieName = "rag-embedding-model";
     public const string ThinkingCookieName = "rag-enable-thinking";
 
     private static readonly JsonSerializerOptions Ndjson = new()
@@ -28,17 +30,20 @@ public class IndexModel : PageModel
     private readonly ILlmService _llm;
     private readonly RagNotesDbContext _db;
     private readonly OmlxOptions _omlx;
+    private readonly IEmbeddingModelCatalog _embeddingModels;
 
     public IndexModel(
         SemanticSearchService search,
         ILlmService llm,
         RagNotesDbContext db,
-        IOptions<OmlxOptions> omlx)
+        IOptions<OmlxOptions> omlx,
+        IEmbeddingModelCatalog embeddingModels)
     {
         _search = search;
         _llm = llm;
         _db = db;
         _omlx = omlx.Value;
+        _embeddingModels = embeddingModels;
     }
 
     [BindProperty]
@@ -47,8 +52,12 @@ public class IndexModel : PageModel
     public string Query { get; set; } = string.Empty;
 
     [BindProperty]
-    [Display(Name = "Model")]
+    [Display(Name = "Chat model")]
     public string ChatModel { get; set; } = string.Empty;
+
+    [BindProperty]
+    [Display(Name = "Embedding model")]
+    public string EmbeddingModel { get; set; } = string.Empty;
 
     [BindProperty]
     [Display(Name = "Enable thinking")]
@@ -62,6 +71,8 @@ public class IndexModel : PageModel
     public List<int> SelectedDocumentIds { get; set; } = [];
 
     public IReadOnlyList<string> ChatModels { get; private set; } = [];
+
+    public IReadOnlyList<EmbeddingModelOption> EmbeddingModels { get; private set; } = [];
 
     public IReadOnlyList<SearchableDocument> Documents { get; private set; } = [];
 
@@ -102,11 +113,13 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         ChatModel = _omlx.ResolveChatModel(Request.Cookies[ChatModelCookieName]);
+        EmbeddingModel = _embeddingModels.Resolve(Request.Cookies[EmbeddingModelCookieName]);
         EnableThinking = string.Equals(
             Request.Cookies[ThinkingCookieName],
             "1",
             StringComparison.Ordinal);
         LoadChatModels();
+        LoadEmbeddingModels();
         await LoadDocumentsAsync();
     }
 
@@ -120,9 +133,10 @@ public class IndexModel : PageModel
             return Page();
 
         var question = Query.Trim();
-        AppliedFilter = DocumentChunkFilter.FromSelection(FilterMode, SelectedDocumentIds);
+        AppliedFilter = BuildFilter();
         Results = await _search.SearchAsync(
             question,
+            EmbeddingModel,
             topK: 5,
             AppliedFilter,
             cancellationToken);
@@ -185,9 +199,10 @@ public class IndexModel : PageModel
             }, cancellationToken);
 
             var question = Query.Trim();
-            var filter = DocumentChunkFilter.FromSelection(FilterMode, SelectedDocumentIds);
+            var filter = BuildFilter();
             var results = await _search.SearchAsync(
                 question,
+                EmbeddingModel,
                 topK: 5,
                 filter,
                 cancellationToken);
@@ -276,11 +291,31 @@ public class IndexModel : PageModel
         return new EmptyResult();
     }
 
+    private DocumentChunkFilter? BuildFilter()
+    {
+        var indexedIds = Documents.Select(document => document.Id).ToHashSet();
+        var selected = SelectedDocumentIds
+            .Where(id => indexedIds.Contains(id))
+            .ToList();
+
+        var selectionFilter = DocumentChunkFilter.FromSelection(FilterMode, selected);
+        if (selectionFilter is not null)
+            return selectionFilter;
+
+        // When no boxes are checked, still limit search to docs indexed with this model.
+        return DocumentChunkFilter.FromSelection(
+            DocumentChunkFilter.IncludeValue,
+            indexedIds);
+    }
+
     private void PreparePreferences()
     {
         ChatModel = _omlx.ResolveChatModel(ChatModel);
+        EmbeddingModel = _embeddingModels.Resolve(EmbeddingModel);
         LoadChatModels();
+        LoadEmbeddingModels();
         RememberChatModel(ChatModel);
+        RememberEmbeddingModel(EmbeddingModel);
         RememberThinking(EnableThinking);
     }
 
@@ -311,7 +346,10 @@ public class IndexModel : PageModel
 
     private async Task LoadDocumentsAsync(CancellationToken cancellationToken = default)
     {
+        var model = _embeddingModels.Resolve(EmbeddingModel);
         Documents = await _db.Documents
+            .Where(document => document.EmbeddingIndexes.Any(index =>
+                index.EmbeddingModel == model))
             .OrderBy(document => document.FileName)
             .ThenBy(document => document.CreatedAt)
             .Select(document => new SearchableDocument(
@@ -333,12 +371,32 @@ public class IndexModel : PageModel
         ChatModels = models;
     }
 
+    private void LoadEmbeddingModels()
+    {
+        var models = _embeddingModels.AvailableModels.ToList();
+        if (!string.IsNullOrEmpty(EmbeddingModel) &&
+            !models.Exists(model => string.Equals(model.Id, EmbeddingModel, StringComparison.Ordinal)))
+        {
+            models.Insert(0, new EmbeddingModelOption { Id = EmbeddingModel, VectorSize = 0 });
+        }
+
+        EmbeddingModels = models;
+    }
+
     private void RememberChatModel(string model)
     {
         if (string.IsNullOrEmpty(model))
             return;
 
-        Response.Cookies.Append(ChatModelCookieName, model, PreferenceCookie());
+        Response.Cookies.Append(ChatModelCookieName, model, PreferenceCookie("/Search"));
+    }
+
+    private void RememberEmbeddingModel(string model)
+    {
+        if (string.IsNullOrEmpty(model))
+            return;
+
+        Response.Cookies.Append(EmbeddingModelCookieName, model, PreferenceCookie("/"));
     }
 
     private void RememberThinking(bool enabled)
@@ -346,16 +404,16 @@ public class IndexModel : PageModel
         Response.Cookies.Append(
             ThinkingCookieName,
             enabled ? "1" : "0",
-            PreferenceCookie());
+            PreferenceCookie("/Search"));
     }
 
-    private static CookieOptions PreferenceCookie() => new()
+    private static CookieOptions PreferenceCookie(string path) => new()
     {
         HttpOnly = true,
         IsEssential = true,
         SameSite = SameSiteMode.Lax,
         MaxAge = TimeSpan.FromDays(30),
-        Path = "/Search"
+        Path = path
     };
 
     public sealed record SearchableDocument(int Id, string FileName, DateTime CreatedAt);

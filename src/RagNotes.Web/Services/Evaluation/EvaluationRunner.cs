@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RagNotes.Web.Data;
+using RagNotes.Web.Services.Embeddings;
 using RagNotes.Web.Services.VectorStore;
 
 namespace RagNotes.Web.Services.Evaluation;
@@ -10,23 +11,32 @@ public sealed class EvaluationRunner
 
     private readonly EvalQuestionCatalog _catalog;
     private readonly RagNotesDbContext _db;
+    private readonly IEmbeddingModelCatalog _embeddingModels;
     private readonly SemanticSearchService _search;
 
     public EvaluationRunner(
         EvalQuestionCatalog catalog,
         RagNotesDbContext db,
+        IEmbeddingModelCatalog embeddingModels,
         SemanticSearchService search)
     {
         _catalog = catalog;
         _db = db;
+        _embeddingModels = embeddingModels;
         _search = search;
     }
 
-    public async Task<EvalRunResult> RunAsync(CancellationToken cancellationToken = default)
+    public async Task<EvalRunResult> RunAsync(
+        string? embeddingModel = null,
+        CancellationToken cancellationToken = default)
     {
+        var model = _embeddingModels.Resolve(embeddingModel);
         var questions = _catalog.Questions;
         var corpusNames = _catalog.CorpusFileNames;
+
         var documents = await _db.Documents
+            .Where(document => document.EmbeddingIndexes.Any(index =>
+                index.EmbeddingModel == model))
             .Select(document => new { document.Id, document.FileName })
             .ToListAsync(cancellationToken);
 
@@ -53,7 +63,12 @@ public sealed class EvaluationRunner
             {
                 var distractorHits = filter is null
                     ? Array.Empty<SearchHit>()
-                    : await _search.SearchAsync(question.Question, TopK, filter, cancellationToken);
+                    : await _search.SearchAsync(
+                        question.Question,
+                        model,
+                        TopK,
+                        filter,
+                        cancellationToken);
                 distractors.Add(new EvalQuestionResult(question, EvalOutcome.Distractor, distractorHits));
                 continue;
             }
@@ -67,6 +82,7 @@ public sealed class EvaluationRunner
 
             var hits = await _search.SearchAsync(
                 question.Question,
+                model,
                 TopK,
                 filter,
                 cancellationToken);
@@ -80,7 +96,8 @@ public sealed class EvaluationRunner
         {
             MissingFiles = missing,
             Answerable = answerable,
-            Distractors = distractors
+            Distractors = distractors,
+            EmbeddingModel = model
         };
     }
 }

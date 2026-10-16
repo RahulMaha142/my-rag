@@ -16,11 +16,21 @@ public class OllamaEmbeddingService : IEmbeddingService
         _options = options.Value;
     }
 
-    public async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
+    public async Task<float[]> EmbedAsync(
+        string text,
+        string model,
+        CancellationToken cancellationToken = default)
     {
+        var embeddingModel = _options.ResolveEmbeddingModel(model);
+        if (string.IsNullOrWhiteSpace(embeddingModel))
+        {
+            throw new InvalidOperationException(
+                "No embedding model was configured for Ollama.");
+        }
+
         var response = await _http.PostAsJsonAsync(
             "/api/embed",
-            new { model = _options.EmbeddingModel, input = text },
+            new { model = embeddingModel, input = text },
             cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -28,7 +38,7 @@ public class OllamaEmbeddingService : IEmbeddingService
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new HttpRequestException(
                 $"Ollama embeddings failed ({(int)response.StatusCode}): {body}. " +
-                $"Model '{_options.EmbeddingModel}' must be pulled (ollama pull {_options.EmbeddingModel}).");
+                $"Model '{embeddingModel}' must be pulled (ollama pull {embeddingModel}).");
         }
 
         var result = await response.Content

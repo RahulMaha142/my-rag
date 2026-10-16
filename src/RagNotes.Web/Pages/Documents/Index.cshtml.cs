@@ -1,14 +1,19 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using RagNotes.Web.Data;
 using RagNotes.Web.Models;
+using RagNotes.Web.Options;
 using RagNotes.Web.Services;
+using RagNotes.Web.Services.Embeddings;
 
 namespace RagNotes.Web.Pages.Documents;
 
 public class IndexModel : PageModel
 {
+    public const string EmbeddingModelCookieName = "rag-embedding-model";
+
     private static readonly HashSet<string> AllowedExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".txt", ".md" };
 
@@ -16,23 +21,39 @@ public class IndexModel : PageModel
 
     private readonly RagNotesDbContext _db;
     private readonly DocumentIndexingService _indexing;
+    private readonly IEmbeddingModelCatalog _embeddingModels;
 
-    public IndexModel(RagNotesDbContext db, DocumentIndexingService indexing)
+    public IndexModel(
+        RagNotesDbContext db,
+        DocumentIndexingService indexing,
+        IEmbeddingModelCatalog embeddingModels)
     {
         _db = db;
         _indexing = indexing;
+        _embeddingModels = embeddingModels;
     }
 
-    public List<Document> Documents { get; private set; } = [];
+    public List<DocumentListItem> Documents { get; private set; } = [];
+
+    public IReadOnlyList<EmbeddingModelOption> EmbeddingModels { get; private set; } = [];
+
+    [BindProperty]
+    [Display(Name = "Embedding model")]
+    public string EmbeddingModel { get; set; } = string.Empty;
+
+    [BindProperty]
+    [Display(Name = "Bulk embedding model")]
+    public string BulkEmbeddingModel { get; set; } = string.Empty;
 
     [TempData]
     public string? StatusMessage { get; set; }
 
     public async Task OnGetAsync()
     {
-        Documents = await _db.Documents
-            .OrderByDescending(d => d.CreatedAt)
-            .ToListAsync();
+        EmbeddingModel = _embeddingModels.Resolve(Request.Cookies[EmbeddingModelCookieName]);
+        BulkEmbeddingModel = EmbeddingModel;
+        LoadEmbeddingModels();
+        await LoadDocumentsAsync();
     }
 
     public async Task<IActionResult> OnPostAsync(
@@ -42,6 +63,10 @@ public class IndexModel : PageModel
         bool preferSentences,
         CancellationToken cancellationToken)
     {
+        EmbeddingModel = _embeddingModels.Resolve(EmbeddingModel);
+        RememberEmbeddingModel(EmbeddingModel);
+        LoadEmbeddingModels();
+
         if (file is null || file.Length == 0)
         {
             StatusMessage = "Please choose a non-empty file.";
@@ -89,14 +114,72 @@ public class IndexModel : PageModel
         _db.Documents.Add(document);
         await _db.SaveChangesAsync(cancellationToken);
 
-        var chunkCount = await _indexing.IndexAsync(
-            document.Id,
-            document.FileName,
-            document.Content,
-            document.ChunkOptions,
-            cancellationToken);
+        try
+        {
+            var chunkCount = await _indexing.IndexAsync(
+                document.Id,
+                document.FileName,
+                document.Content,
+                document.ChunkOptions,
+                EmbeddingModel,
+                cancellationToken);
 
-        StatusMessage = $"Uploaded \"{document.FileName}\" ({chunkCount} chunks indexed).";
+            StatusMessage =
+                $"Uploaded \"{document.FileName}\" ({chunkCount} chunks indexed with {EmbeddingModel}).";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+        {
+            StatusMessage =
+                $"Saved \"{document.FileName}\", but indexing failed: {ex.Message} " +
+                "Open the document and index it into an embedding model to retry.";
+        }
+
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostIndexMissingAsync(CancellationToken cancellationToken)
+    {
+        var model = _embeddingModels.Resolve(BulkEmbeddingModel);
+        RememberEmbeddingModel(model);
+
+        var documents = await _db.Documents
+            .Include(document => document.EmbeddingIndexes)
+            .OrderBy(document => document.FileName)
+            .ToListAsync(cancellationToken);
+
+        var missing = documents
+            .Where(document => document.EmbeddingIndexes.All(index =>
+                !string.Equals(index.EmbeddingModel, model, StringComparison.Ordinal)))
+            .ToList();
+
+        if (missing.Count == 0)
+        {
+            StatusMessage = $"Every document is already indexed with {model}.";
+            return RedirectToPage();
+        }
+
+        var succeeded = 0;
+        var failed = 0;
+        string? firstError = null;
+
+        foreach (var document in missing)
+        {
+            try
+            {
+                await _indexing.IndexIntoModelAsync(document, model, cancellationToken);
+                succeeded++;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+            {
+                failed++;
+                firstError ??= ex.Message;
+            }
+        }
+
+        StatusMessage = failed == 0
+            ? $"Indexed {succeeded} document(s) into {model}."
+            : $"Indexed {succeeded} document(s) into {model}; {failed} failed. First error: {firstError}";
+
         return RedirectToPage();
     }
 
@@ -114,5 +197,70 @@ public class IndexModel : PageModel
         }
 
         return RedirectToPage();
+    }
+
+    private async Task LoadDocumentsAsync()
+    {
+        Documents = await _db.Documents
+            .AsNoTracking()
+            .OrderByDescending(document => document.CreatedAt)
+            .Select(document => new DocumentListItem(
+                document.Id,
+                document.FileName,
+                document.CreatedAt,
+                document.MaxTokens,
+                document.OverlapPercent,
+                document.PreferSentences,
+                document.EmbeddingIndexes
+                    .OrderBy(index => index.EmbeddingModel)
+                    .Select(index => index.EmbeddingModel)
+                    .ToList()))
+            .ToListAsync();
+    }
+
+    private void LoadEmbeddingModels()
+    {
+        var models = _embeddingModels.AvailableModels.ToList();
+        EnsureListed(models, EmbeddingModel);
+        EnsureListed(models, BulkEmbeddingModel);
+        EmbeddingModels = models;
+    }
+
+    private static void EnsureListed(List<EmbeddingModelOption> models, string modelId)
+    {
+        if (string.IsNullOrEmpty(modelId) ||
+            models.Exists(model => string.Equals(model.Id, modelId, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        models.Insert(0, new EmbeddingModelOption { Id = modelId, VectorSize = 0 });
+    }
+
+    private void RememberEmbeddingModel(string model)
+    {
+        if (string.IsNullOrEmpty(model))
+            return;
+
+        Response.Cookies.Append(EmbeddingModelCookieName, model, new CookieOptions
+        {
+            HttpOnly = true,
+            IsEssential = true,
+            SameSite = SameSiteMode.Lax,
+            MaxAge = TimeSpan.FromDays(30),
+            Path = "/"
+        });
+    }
+
+    public sealed record DocumentListItem(
+        int Id,
+        string FileName,
+        DateTime CreatedAt,
+        int MaxTokens,
+        int OverlapPercent,
+        bool PreferSentences,
+        IReadOnlyList<string> EmbeddingModels)
+    {
+        public ChunkOptions ChunkOptions => new(MaxTokens, OverlapPercent, PreferSentences);
     }
 }

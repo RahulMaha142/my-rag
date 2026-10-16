@@ -11,7 +11,19 @@
       class="mb-4"
       data-stream-url="@Url.Page("/Search/Index", "Stream")">
     <div class="row mb-3">
-    <div class="col-md-4 mb-3 mb-md-0">
+    <div class="col-md-3 mb-3 mb-md-0">
+        <label asp-for="EmbeddingModel" class="form-label"></label>
+        <select asp-for="EmbeddingModel" class="form-select">
+            @foreach (var embeddingModel in Model.EmbeddingModels)
+            {
+                <option value="@embeddingModel.Id">
+                    @embeddingModel.Id@(embeddingModel.VectorSize > 0 ? $" ({embeddingModel.VectorSize}d)" : "")
+                </option>
+            }
+        </select>
+        <div class="form-text">Must match the model used when indexing.</div>
+    </div>
+    <div class="col-md-3 mb-3 mb-md-0">
         <label asp-for="ChatModel" class="form-label"></label>
         <select asp-for="ChatModel" class="form-select">
             @foreach (var chatModel in Model.ChatModels)
@@ -24,14 +36,14 @@
             <label asp-for="EnableThinking" class="form-check-label"></label>
         </div>
     </div>
-    <div class="col-md-4 mb-3 mb-md-0">
+    <div class="col-md-3 mb-3 mb-md-0">
         <label asp-for="FilterMode" class="form-label"></label>
         <select asp-for="FilterMode" class="form-select">
             <option value="include">Only selected documents</option>
             <option value="exclude">Exclude selected documents</option>
         </select>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <label class="form-label" id="document-filter-label">Documents</label>
         <div class="dropdown">
             <button type="button"
@@ -70,7 +82,7 @@
                 }
             </div>
         </div>
-        <div class="form-text">Leave every box unchecked to search all documents.</div>
+        <div class="form-text">Only documents indexed with the selected embedding model are listed. Leave every box unchecked to search all of them.</div>
     </div>
     </div>
     <div class="mb-3">

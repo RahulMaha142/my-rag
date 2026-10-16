@@ -51,7 +51,43 @@ namespace RagNotes.Web.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Documents", (string)null);
+                    b.ToTable("Documents");
+                });
+
+            modelBuilder.Entity("RagNotes.Web.Models.DocumentEmbeddingIndex", b =>
+                {
+                    b.Property<int>("DocumentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EmbeddingModel")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ChunkCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("IndexedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("DocumentId", "EmbeddingModel");
+
+                    b.ToTable("DocumentEmbeddingIndexes");
+                });
+
+            modelBuilder.Entity("RagNotes.Web.Models.DocumentEmbeddingIndex", b =>
+                {
+                    b.HasOne("RagNotes.Web.Models.Document", "Document")
+                        .WithMany("EmbeddingIndexes")
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+                });
+
+            modelBuilder.Entity("RagNotes.Web.Models.Document", b =>
+                {
+                    b.Navigation("EmbeddingIndexes");
                 });
 #pragma warning restore 612, 618
         }

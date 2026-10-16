@@ -9,17 +9,30 @@
 
 <p>
     Runs @Model.AnswerableCount answerable questions and @Model.DistractorCount distractors
-    against the six Federalist essays already in the collection. This scores retrieval only.
-    Embedding each question can take about a minute.
+    against the six Federalist essays indexed with the selected embedding model.
+    This scores retrieval only. Embedding each question can take about a minute.
 </p>
 
 <form method="post" id="evaluation-form" class="mb-4">
+    <div class="mb-3" style="max-width: 28rem;">
+        <label asp-for="EmbeddingModel" class="form-label"></label>
+        <select asp-for="EmbeddingModel" class="form-select">
+            @foreach (var embeddingModel in Model.EmbeddingModels)
+            {
+                <option value="@embeddingModel.Id">
+                    @embeddingModel.Id@(embeddingModel.VectorSize > 0 ? $" ({embeddingModel.VectorSize}d)" : "")
+                </option>
+            }
+        </select>
+    </div>
     <button type="submit" class="btn btn-primary" id="evaluation-submit">Run evaluation</button>
 </form>
 
 @if (Model.HasRun && Model.Result is not null)
 {
     var result = Model.Result;
+
+    <p class="text-muted">Embedding model: @result.EmbeddingModel</p>
 
     @if (result.MissingFiles.Count > 0)
     {

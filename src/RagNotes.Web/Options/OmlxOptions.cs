@@ -6,6 +6,11 @@ public class OmlxOptions
 
     public string BaseUrl { get; set; } = "http://127.0.0.1:8000";
     public string EmbeddingModel { get; set; } = "bge-m3-mlx-4bit";
+    public EmbeddingModelOption[] EmbeddingModels { get; set; } =
+    [
+        new() { Id = "bge-m3-mlx-4bit", VectorSize = 1024 },
+        new() { Id = "Qwen3-Embedding-8B-4bit-DWQ", VectorSize = 4096 }
+    ];
     public string ChatModel { get; set; } = "Qwen3.8-27B-4bit";
     public string[] ChatModels { get; set; } =
     [
@@ -14,6 +19,15 @@ public class OmlxOptions
         "granite-3.3-8b-instruct-6bit"
     ];
     public string? ApiKey { get; set; }
+
+    public IReadOnlyList<EmbeddingModelOption> AvailableEmbeddingModels =>
+        EmbeddingModelCatalog.Available(EmbeddingModel, EmbeddingModels);
+
+    public string ResolveEmbeddingModel(string? requested) =>
+        EmbeddingModelCatalog.Resolve(requested, EmbeddingModel, AvailableEmbeddingModels);
+
+    public ulong GetVectorSize(string modelId) =>
+        EmbeddingModelCatalog.GetVectorSize(modelId, AvailableEmbeddingModels);
 
     public IReadOnlyList<string> AvailableChatModels
     {

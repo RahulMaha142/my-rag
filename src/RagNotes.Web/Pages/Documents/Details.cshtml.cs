@@ -1,9 +1,13 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
 using RagNotes.Web.Data;
 using RagNotes.Web.Models;
+using RagNotes.Web.Options;
 using RagNotes.Web.Services;
 using RagNotes.Web.Services.Chunking;
+using RagNotes.Web.Services.Embeddings;
 
 namespace RagNotes.Web.Pages.Documents;
 
@@ -15,12 +19,18 @@ public class DetailsModel : PageModel
     private readonly RagNotesDbContext _db;
     private readonly ITextChunker _chunker;
     private readonly DocumentIndexingService _indexing;
+    private readonly IEmbeddingModelCatalog _embeddingModels;
 
-    public DetailsModel(RagNotesDbContext db, ITextChunker chunker, DocumentIndexingService indexing)
+    public DetailsModel(
+        RagNotesDbContext db,
+        ITextChunker chunker,
+        DocumentIndexingService indexing,
+        IEmbeddingModelCatalog embeddingModels)
     {
         _db = db;
         _chunker = chunker;
         _indexing = indexing;
+        _embeddingModels = embeddingModels;
     }
 
     public Document Document { get; private set; } = null!;
@@ -28,10 +38,16 @@ public class DetailsModel : PageModel
     public bool ContentIsTruncated { get; private set; }
     public bool ShowFullContent { get; private set; }
     public IReadOnlyList<TextChunk> Chunks { get; private set; } = [];
+    public IReadOnlyList<DocumentEmbeddingIndex> Indexes { get; private set; } = [];
+    public IReadOnlyList<EmbeddingModelOption> MissingEmbeddingModels { get; private set; } = [];
     public int PageNumber { get; private set; }
     public int PageSize { get; private set; } = DefaultPageSize;
     public int TotalChunks { get; private set; }
     public int TotalPages { get; private set; }
+
+    [BindProperty]
+    [Display(Name = "Embedding model")]
+    public string EmbeddingModel { get; set; } = string.Empty;
 
     [TempData]
     public string? StatusMessage { get; set; }
@@ -42,29 +58,15 @@ public class DetailsModel : PageModel
         bool showFullContent = false,
         CancellationToken cancellationToken = default)
     {
-        var document = await _db.Documents.FindAsync([id], cancellationToken);
+        var document = await _db.Documents
+            .Include(item => item.EmbeddingIndexes)
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (document is null)
         {
             return NotFound();
         }
 
-        Document = document;
-        ShowFullContent = showFullContent;
-
-        var content = document.Content ?? string.Empty;
-        ContentIsTruncated = content.Length > ContentPreviewLength;
-        DisplayContent = ShowFullContent || !ContentIsTruncated
-            ? content
-            : content[..ContentPreviewLength];
-
-        var allChunks = _chunker.Chunk(content, document.Id, document.ChunkOptions);
-        TotalChunks = allChunks.Count;
-        TotalPages = Math.Max(1, (int)Math.Ceiling(TotalChunks / (double)PageSize));
-        PageNumber = Math.Clamp(pageNumber, 1, TotalPages);
-
-        var skip = (PageNumber - 1) * PageSize;
-        Chunks = allChunks.Skip(skip).Take(PageSize).ToList();
-
+        BindDocument(document, pageNumber, showFullContent);
         return Page();
     }
 
@@ -75,7 +77,9 @@ public class DetailsModel : PageModel
         bool preferSentences,
         CancellationToken cancellationToken)
     {
-        var document = await _db.Documents.FindAsync([id], cancellationToken);
+        var document = await _db.Documents
+            .Include(item => item.EmbeddingIndexes)
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (document is null)
         {
             return NotFound();
@@ -109,7 +113,8 @@ public class DetailsModel : PageModel
                 document.ChunkOptions,
                 cancellationToken);
 
-            StatusMessage = $"Reindexed \"{document.FileName}\" ({chunkCount} chunks).";
+            StatusMessage =
+                $"Reindexed \"{document.FileName}\" across attached embedding models ({chunkCount} chunk vectors written).";
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
         {
@@ -118,5 +123,87 @@ public class DetailsModel : PageModel
         }
 
         return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostIndexIntoModelAsync(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var document = await _db.Documents
+            .Include(item => item.EmbeddingIndexes)
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (document is null)
+        {
+            return NotFound();
+        }
+
+        var model = _embeddingModels.Resolve(EmbeddingModel);
+        if (document.EmbeddingIndexes.Any(index =>
+                string.Equals(index.EmbeddingModel, model, StringComparison.Ordinal)))
+        {
+            StatusMessage = $"\"{document.FileName}\" is already indexed with {model}.";
+            return RedirectToPage(new { id });
+        }
+
+        try
+        {
+            var chunkCount = await _indexing.IndexIntoModelAsync(document, model, cancellationToken);
+            StatusMessage = $"Indexed \"{document.FileName}\" into {model} ({chunkCount} chunks).";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+        {
+            StatusMessage = $"Indexing into {model} failed: {ex.Message}";
+        }
+
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostRemoveFromModelAsync(
+        int id,
+        string embeddingModel,
+        CancellationToken cancellationToken)
+    {
+        var document = await _db.Documents.FindAsync([id], cancellationToken);
+        if (document is null)
+        {
+            return NotFound();
+        }
+
+        var model = _embeddingModels.Resolve(embeddingModel);
+        await _indexing.RemoveFromModelAsync(id, model, cancellationToken);
+        StatusMessage = $"Removed \"{document.FileName}\" from {model}.";
+        return RedirectToPage(new { id });
+    }
+
+    private void BindDocument(Document document, int pageNumber, bool showFullContent)
+    {
+        Document = document;
+        ShowFullContent = showFullContent;
+        Indexes = document.EmbeddingIndexes
+            .OrderBy(index => index.EmbeddingModel)
+            .ToList();
+
+        var indexed = Indexes
+            .Select(index => index.EmbeddingModel)
+            .ToHashSet(StringComparer.Ordinal);
+        MissingEmbeddingModels = _embeddingModels.AvailableModels
+            .Where(model => !indexed.Contains(model.Id))
+            .ToList();
+        EmbeddingModel = MissingEmbeddingModels.FirstOrDefault()?.Id
+            ?? _embeddingModels.DefaultModel;
+
+        var content = document.Content ?? string.Empty;
+        ContentIsTruncated = content.Length > ContentPreviewLength;
+        DisplayContent = ShowFullContent || !ContentIsTruncated
+            ? content
+            : content[..ContentPreviewLength];
+
+        var allChunks = _chunker.Chunk(content, document.Id, document.ChunkOptions);
+        TotalChunks = allChunks.Count;
+        TotalPages = Math.Max(1, (int)Math.Ceiling(TotalChunks / (double)PageSize));
+        PageNumber = Math.Clamp(pageNumber, 1, TotalPages);
+
+        var skip = (PageNumber - 1) * PageSize;
+        Chunks = allChunks.Skip(skip).Take(PageSize).ToList();
     }
 }

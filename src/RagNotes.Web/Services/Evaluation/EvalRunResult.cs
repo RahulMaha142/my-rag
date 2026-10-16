@@ -23,6 +23,8 @@ public sealed class EvalRunResult
 
     public required IReadOnlyList<EvalQuestionResult> Distractors { get; init; }
 
+    public string EmbeddingModel { get; init; } = string.Empty;
+
     public int PassCount => Answerable.Count(result => result.Outcome == EvalOutcome.Passed);
 
     public int ScoredCount => Answerable.Count(result =>

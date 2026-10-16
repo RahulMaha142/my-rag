@@ -22,6 +22,18 @@
                accept=".txt,.md"
                required />
     </div>
+    <div class="mb-3">
+        <label asp-for="EmbeddingModel" class="form-label"></label>
+        <select asp-for="EmbeddingModel" class="form-select">
+            @foreach (var embeddingModel in Model.EmbeddingModels)
+            {
+                <option value="@embeddingModel.Id">
+                    @embeddingModel.Id@(embeddingModel.VectorSize > 0 ? $" ({embeddingModel.VectorSize}d)" : "")
+                </option>
+            }
+        </select>
+        <div class="form-text">Vectors are stored in a separate Qdrant collection per embedding model.</div>
+    </div>
     <div class="row mb-3">
         <div class="col-md-4">
             <label for="maxTokens" class="form-label">Max tokens</label>
@@ -62,6 +74,31 @@
     <button type="submit" class="btn btn-primary">Upload</button>
 </form>
 
+@if (Model.Documents.Count > 0 && Model.EmbeddingModels.Count > 0)
+{
+    <h2>Index missing documents</h2>
+    <p class="text-muted">
+        Embed every uploaded document that is not yet in the selected model’s collection.
+        Existing indexes for other models are left alone.
+    </p>
+    <form method="post" asp-page-handler="IndexMissing" class="row g-2 align-items-end mb-4">
+        <div class="col-md-6">
+            <label asp-for="BulkEmbeddingModel" class="form-label"></label>
+            <select asp-for="BulkEmbeddingModel" class="form-select">
+                @foreach (var embeddingModel in Model.EmbeddingModels)
+                {
+                    <option value="@embeddingModel.Id">
+                        @embeddingModel.Id@(embeddingModel.VectorSize > 0 ? $" ({embeddingModel.VectorSize}d)" : "")
+                    </option>
+                }
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <button type="submit" class="btn btn-outline-primary">Index missing documents</button>
+        </div>
+    </form>
+}
+
 <h2>Uploaded Documents</h2>
 
 @if (Model.Documents.Count == 0)
@@ -75,6 +112,7 @@ else
             <tr>
                 <th>File name</th>
                 <th>Chunking</th>
+                <th>Embeddings</th>
                 <th>Uploaded</th>
                 <th></th>
             </tr>
@@ -87,6 +125,16 @@ else
                     <a asp-page="/Documents/Details" asp-route-id="@doc.Id">@doc.FileName</a>
                 </td>
                 <td>@doc.ChunkOptions.Summary</td>
+                <td>
+                    @if (doc.EmbeddingModels.Count == 0)
+                    {
+                        <span class="text-muted">None</span>
+                    }
+                    else
+                    {
+                        @string.Join(", ", doc.EmbeddingModels)
+                    }
+                </td>
                 <td>@doc.CreatedAt.ToLocalTime().ToString("g")</td>
                 <td>
                     <form method="post" asp-page-handler="Delete">

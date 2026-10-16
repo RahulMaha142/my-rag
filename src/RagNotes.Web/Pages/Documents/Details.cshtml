@@ -45,9 +45,75 @@
     </p>
 }
 
+<h2 class="mt-4">Embedding indexes</h2>
+<p class="text-muted">
+    Each embedding model uses its own Qdrant collection. Indexing into another model
+    does not remove existing indexes.
+</p>
+
+@if (Model.Indexes.Count == 0)
+{
+    <p class="text-muted">Not indexed in any embedding model yet.</p>
+}
+else
+{
+    <table class="table table-sm mb-3">
+        <thead>
+            <tr>
+                <th>Model</th>
+                <th>Chunks</th>
+                <th>Indexed</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var index in Model.Indexes)
+        {
+            <tr>
+                <td>@index.EmbeddingModel</td>
+                <td>@index.ChunkCount</td>
+                <td>@index.IndexedAt.ToLocalTime().ToString("g")</td>
+                <td>
+                    <form method="post" asp-page-handler="RemoveFromModel" class="d-inline">
+                        <input type="hidden" name="id" value="@Model.Document.Id" />
+                        <input type="hidden" name="embeddingModel" value="@index.EmbeddingModel" />
+                        <button type="submit"
+                                class="btn btn-sm btn-outline-danger"
+                                onclick="return confirm('Remove this document from @index.EmbeddingModel?');">
+                            Remove
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@if (Model.MissingEmbeddingModels.Count > 0)
+{
+    <form method="post" asp-page-handler="IndexIntoModel" class="row g-2 align-items-end mb-4">
+        <input type="hidden" name="id" value="@Model.Document.Id" />
+        <div class="col-md-6">
+            <label asp-for="EmbeddingModel" class="form-label"></label>
+            <select asp-for="EmbeddingModel" class="form-select">
+                @foreach (var embeddingModel in Model.MissingEmbeddingModels)
+                {
+                    <option value="@embeddingModel.Id">
+                        @embeddingModel.Id@(embeddingModel.VectorSize > 0 ? $" ({embeddingModel.VectorSize}d)" : "")
+                    </option>
+                }
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <button type="submit" class="btn btn-outline-primary">Index into this model</button>
+        </div>
+    </form>
+}
+
 <h2 class="mt-4">Chunking</h2>
 <p class="text-muted">
-    Saving replaces this document’s embeddings with chunks from the new settings.
+    Saving reindexes this document in every embedding model it is already attached to.
 </p>
 <form method="post" asp-page-handler="Reindex" class="mb-4">
     <input type="hidden" name="id" value="@Model.Document.Id" />
@@ -103,7 +169,7 @@
     }
 </h2>
 <p class="text-muted">
-    Vectors for these chunks are stored in Qdrant.
+    Vectors for these chunks are stored in each attached embedding model’s Qdrant collection.
 </p>
 
 @if (Model.TotalChunks == 0)
